@@ -1,16 +1,11 @@
-// @ts-ignore
-import openAiLogo from "../../assets/ai-logos/openai-logo.svg";
-// @ts-ignore
-import googleLogo from "../../assets/ai-logos/google-logo.svg";
-// @ts-ignore
-import anthropicLogo from "../../assets/ai-logos/anthropic-logo.svg";
-import { IpcClient } from "@/ipc/ipc_client";
+"use client";
 import { useState } from "react";
 import { KeyRound } from "lucide-react";
 
 import { useSettings } from "@/hooks/useSettings";
 import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { Button } from "./ui/button";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 export function ProBanner() {
   const { settings } = useSettings();
@@ -50,9 +45,7 @@ export function ManageDyadProButton() {
       size="lg"
       className="w-full mt-4 bg-(--background-lighter) text-primary"
       onClick={() => {
-        IpcClient.getInstance().openExternalUrl(
-          "https://academy.dyad.sh/subscription",
-        );
+        openExternalUrl("https://academy.dyad.sh/subscription");
       }}
     >
       <KeyRound aria-hidden="true" />
@@ -68,9 +61,7 @@ export function SetupDyadProButton() {
       size="lg"
       className="w-full mt-4 bg-(--background-lighter) text-primary"
       onClick={() => {
-        IpcClient.getInstance().openExternalUrl(
-          "https://academy.dyad.sh/settings",
-        );
+        openExternalUrl("https://academy.dyad.sh/settings");
       }}
     >
       <KeyRound aria-hidden="true" />
@@ -84,7 +75,7 @@ export function AiAccessBanner() {
     <div
       className="w-full py-2 sm:py-2.5 md:py-3 rounded-lg bg-gradient-to-br from-white via-indigo-50 to-sky-100 dark:from-indigo-700 dark:via-indigo-700 dark:to-indigo-900 flex items-center justify-center relative overflow-hidden ring-1 ring-inset ring-black/5 dark:ring-white/10 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-[1px]"
       onClick={() => {
-        IpcClient.getInstance().openExternalUrl(
+        openExternalUrl(
           "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=in-app-banner-ai-access",
         );
       }}
@@ -114,7 +105,7 @@ export function AiAccessBanner() {
         <div className="mt-1.5 sm:mt-2 grid grid-cols-3 gap-6 md:gap-8 items-center justify-items-center opacity-90">
           <div className="flex items-center justify-center">
             <img
-              src={openAiLogo}
+              src="/ai-logos/openai-logo.svg"
               alt="OpenAI"
               width={96}
               height={28}
@@ -123,7 +114,7 @@ export function AiAccessBanner() {
           </div>
           <div className="flex items-center justify-center">
             <img
-              src={googleLogo}
+              src="/ai-logos/google-logo.svg"
               alt="Google"
               width={110}
               height={30}
@@ -132,7 +123,7 @@ export function AiAccessBanner() {
           </div>
           <div className="flex items-center justify-center">
             <img
-              src={anthropicLogo}
+              src="/ai-logos/anthropic-logo.svg"
               alt="Anthropic"
               width={110}
               height={30}
@@ -150,7 +141,7 @@ export function SmartContextBanner() {
     <div
       className="w-full py-2 sm:py-2.5 md:py-3 rounded-lg bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200 dark:from-emerald-700 dark:via-emerald-700 dark:to-emerald-900 flex items-center justify-center relative overflow-hidden ring-1 ring-inset ring-emerald-900/10 dark:ring-white/10 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-[1px]"
       onClick={() => {
-        IpcClient.getInstance().openExternalUrl(
+        openExternalUrl(
           "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=in-app-banner-smart-context",
         );
       }}
@@ -191,7 +182,7 @@ export function TurboBanner() {
     <div
       className="w-full py-2 sm:py-2.5 md:py-3 rounded-lg bg-gradient-to-br from-rose-50 via-rose-100 to-rose-200 dark:from-rose-800 dark:via-fuchsia-800 dark:to-rose-800 flex items-center justify-center relative overflow-hidden ring-1 ring-inset ring-rose-900/10 dark:ring-white/5 shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-[1px]"
       onClick={() => {
-        IpcClient.getInstance().openExternalUrl(
+        openExternalUrl(
           "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=in-app-banner-turbo",
         );
       }}

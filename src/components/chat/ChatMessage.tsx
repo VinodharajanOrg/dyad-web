@@ -1,24 +1,15 @@
-import type { Message } from "@/ipc/ipc_types";
+"use client";
+import type { Message } from "@/types/ipc_types";
 import {
   DyadMarkdownParser,
   VanillaMarkdownParser,
 } from "./DyadMarkdownParser";
 import { motion } from "framer-motion";
 import { useStreamChat } from "@/hooks/useStreamChat";
-import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  GitCommit,
-  Copy,
-  Check,
-  Info,
-  Bot,
-} from "lucide-react";
+import { Clock, GitCommit, Copy, Check } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
-import { useVersions } from "@/hooks/useVersions";
-import { useAtomValue } from "jotai";
-import { selectedAppIdAtom } from "@/atoms/appAtoms";
+// import { useAtomValue } from "jotai";
+// import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import {
@@ -30,35 +21,42 @@ import {
 
 interface ChatMessageProps {
   message: Message;
-  isLastMessage: boolean;
+  chatId: number;
+  isLastMessage?: boolean;
 }
 
-const ChatMessage = ({ message, isLastMessage }: ChatMessageProps) => {
+const ChatMessage = ({ message, chatId, isLastMessage }: ChatMessageProps) => {
   const { isStreaming } = useStreamChat();
-  const appId = useAtomValue(selectedAppIdAtom);
-  const { versions: liveVersions } = useVersions(appId);
+  //const appId = useAtomValue(selectedAppIdAtom);
+  // const { versions: liveVersions } = useVersions(appId);
   //handle copy chat
   const { copyMessageContent, copied } = useCopyToClipboard();
   const handleCopyFormatted = async () => {
     await copyMessageContent(message.content);
   };
+
+  type MessageVersion = {
+    message: string;
+  };
+
   // Find the version that was active when this message was sent
-  const messageVersion = useMemo(() => {
-    if (
-      message.role === "assistant" &&
-      message.commitHash &&
-      liveVersions.length
-    ) {
-      return (
-        liveVersions.find(
-          (version) =>
-            message.commitHash &&
-            version.oid.slice(0, 7) === message.commitHash.slice(0, 7),
-        ) || null
-      );
-    }
+  const messageVersion = useMemo<MessageVersion | null>(() => {
+    // NOTE: Bypass version linking for now
+    // if (
+    //   message.role === "assistant" &&
+    //   message.commitHash &&
+    //   liveVersions.length
+    // ) {
+    //   return (
+    //     liveVersions.find(
+    //       (version) =>
+    //         message.commitHash &&
+    //         version.oid.slice(0, 7) === message.commitHash.slice(0, 7),
+    //     ) || null
+    //   );
+    // }
     return null;
-  }, [message.commitHash, message.role, liveVersions]);
+  }, [message.commitHash, message.role]);
 
   // handle copy request id
   const [copiedRequestId, setCopiedRequestId] = useState(false);
@@ -141,7 +139,10 @@ const ChatMessage = ({ message, isLastMessage }: ChatMessageProps) => {
             >
               {message.role === "assistant" ? (
                 <>
-                  <DyadMarkdownParser content={message.content} />
+                  <DyadMarkdownParser
+                    content={message.content}
+                    chatId={chatId}
+                  />
                   {isLastMessage && isStreaming && (
                     <div className="mt-4 ml-4 relative w-5 h-5 animate-spin">
                       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-(--primary) dark:bg-blue-500 rounded-full"></div>
@@ -159,7 +160,10 @@ const ChatMessage = ({ message, isLastMessage }: ChatMessageProps) => {
           message.approvalState ? (
             <div
               className={`mt-2 flex items-center ${
-                message.role === "assistant" && message.content && !isStreaming
+                message.role === "assistant" &&
+                message.content &&
+                !isStreaming &&
+                message.approvalState
                   ? "justify-between"
                   : ""
               } text-xs`}
@@ -189,29 +193,23 @@ const ChatMessage = ({ message, isLastMessage }: ChatMessageProps) => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-              <div className="flex flex-wrap gap-2">
-                {message.approvalState && (
-                  <div className="flex items-center space-x-1">
-                    {message.approvalState === "approved" ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Approved</span>
-                      </>
-                    ) : message.approvalState === "rejected" ? (
-                      <>
-                        <XCircle className="h-4 w-4 text-red-500" />
-                        <span>Rejected</span>
-                      </>
-                    ) : null}
-                  </div>
-                )}
-                {message.role === "assistant" && message.model && (
-                  <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 w-full sm:w-auto">
-                    <Bot className="h-4 w-4 flex-shrink-0" />
-                    <span>{message.model}</span>
-                  </div>
-                )}
-              </div>
+              {/* NOTE: Bypass proposal approval/rejection as of now */}
+              {/* NOTE: Proposal parser at client side - Show approval status */}
+              {/* {message.approvalState && (
+                <div className="flex items-center space-x-1">
+                  {message.approvalState === "approved" ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>Approved</span>
+                    </>
+                  ) : message.approvalState === "rejected" ? (
+                    <>
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      <span>Rejected</span>
+                    </>
+                  ) : null}
+                </div>
+              )} */}
             </div>
           ) : null}
         </div>
@@ -280,20 +278,6 @@ const ChatMessage = ({ message, isLastMessage }: ChatMessageProps) => {
                     {copiedRequestId
                       ? "Copied!"
                       : `Copy Request ID: ${message.requestId.slice(0, 8)}...`}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {isLastMessage && message.totalTokens && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center space-x-1 px-1 py-0.5">
-                      <Info className="h-3 w-3" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Max tokens used: {message.totalTokens.toLocaleString()}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

@@ -1,3 +1,4 @@
+"use client";
 import { Info, KeyRound, Trash2, Clipboard } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,7 +29,7 @@ interface ApiKeyConfigurationProps {
   envVars: Record<string, string | undefined>;
   envVarName?: string;
   isSaving: boolean;
-  saveError: string | null;
+  saveError: string | undefined;
   apiKeyInput: string;
   onApiKeyInputChange: (value: string) => void;
   onSaveKey: (value: string) => Promise<void>;
@@ -68,7 +69,10 @@ export function ApiKeyConfiguration({
   }
 
   const envApiKey = envVarName ? envVars[envVarName] : undefined;
-  const userApiKey = settings?.providerSettings?.[provider]?.apiKey?.value;
+  // Get API key from settings - check both the new flat apiKeys structure and nested structure for backward compatibility
+  const userApiKey =
+    (settings as any)?.apiKeys?.[provider.toLowerCase()] ||
+    settings?.providerSettings?.[provider.toLowerCase()]?.apiKey?.value;
 
   const isValidUserKey =
     !!userApiKey &&

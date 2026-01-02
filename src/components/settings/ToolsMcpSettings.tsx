@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,8 @@ import { useMcp, type Transport } from "@/hooks/useMcp";
 import { showError, showInfo, showSuccess } from "@/lib/toast";
 import { Edit2, Plus, Save, Trash2, X } from "lucide-react";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
-import { AddMcpServerDeepLinkData } from "@/ipc/deep_link_data";
+// @ts-ignore
+import { AddMcpServerDeepLinkData } from "@/types/deep-links";
 
 type KeyValue = { key: string; value: string };
 
@@ -302,9 +304,7 @@ export function ToolsMcpSettings() {
   const [url, setUrl] = useState("");
   const [enabled, setEnabled] = useState(true);
   const { lastDeepLink, clearLastDeepLink } = useDeepLink();
-  console.log("lastDeepLink!!!", lastDeepLink);
   useEffect(() => {
-    console.log("rerun effect");
     const handleDeepLink = async () => {
       if (lastDeepLink?.type === "add-mcp-server") {
         const deepLink = lastDeepLink as AddMcpServerDeepLinkData;

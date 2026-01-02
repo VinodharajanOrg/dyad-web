@@ -1,8 +1,9 @@
+"use client";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { IpcClient } from "../../ipc/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 import { Package, ChevronsUpDown, ChevronsDownUp } from "lucide-react";
 import { CodeHighlight } from "./CodeHighlight";
@@ -45,9 +46,7 @@ export const DyadAddDependency: React.FC<DyadAddDependencyProps> = ({
                     className="cursor-pointer text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     key={p}
                     onClick={() => {
-                      IpcClient.getInstance().openExternalUrl(
-                        `https://www.npmjs.com/package/${p}`,
-                      );
+                      openExternalUrl(`https://www.npmjs.com/package/${p}`);
                     }}
                   >
                     {p}

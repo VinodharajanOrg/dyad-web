@@ -1,35 +1,37 @@
+"use client";
+
 import {
   StopCircleIcon,
-  X,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  AlertOctagon,
-  FileText,
-  Check,
-  Loader2,
-  Package,
-  FileX,
-  SendToBack,
-  Database,
-  ChevronsUpDown,
-  ChevronsDownUp,
+  // X,
+  // ChevronDown,
+  // ChevronUp,
+  // AlertTriangle,
+  // AlertOctagon,
+  // FileText,
+  // Check,
+  // Loader2,
+  // Package,
+  // FileX,
+  // SendToBack,
+  // Database,
+  // ChevronsUpDown,
+  // ChevronsDownUp,
   ChartColumnIncreasing,
   SendHorizontalIcon,
-  Lock,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useSettings } from "@/hooks/useSettings";
-import { IpcClient } from "@/ipc/ipc_client";
+import { useChat /*, chatsKeys */ } from "@/hooks/useChats";
+import { chatsApi } from "@/api/endpoints/chats";
+// import { useQueryClient } from "@tanstack/react-query";
 import {
   chatInputValueAtom,
-  chatMessagesByIdAtom,
+  // chatMessagesByIdAtom,
   selectedChatIdAtom,
-  pendingAgentConsentsAtom,
 } from "@/atoms/chatAtoms";
-import { atom, useAtom, useSetAtom, useAtomValue } from "jotai";
+import { atom, useAtom, /*useSetAtom,*/ useAtomValue } from "jotai";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { Button } from "@/components/ui/button";
@@ -38,92 +40,64 @@ import {
   ActionProposal,
   Proposal,
   SuggestedAction,
-  FileChange,
-  SqlQuery,
+  // FileChange,
+  // SqlQuery,
 } from "@/lib/schemas";
 
-import { isPreviewOpenAtom } from "@/atoms/viewAtoms";
+// import { isPreviewOpenAtom } from "@/atoms/viewAtoms";
 import { useRunApp } from "@/hooks/useRunApp";
-import { AutoApproveSwitch } from "../AutoApproveSwitch";
+// import { AutoApproveSwitch } from "../AutoApproveSwitch";
 import { usePostHog } from "posthog-js/react";
-import { CodeHighlight } from "./CodeHighlight";
+// import { CodeHighlight } from "./CodeHighlight";
 import { TokenBar } from "./TokenBar";
+// import { invalidateAppQuery } from "@/hooks/useLoadApp";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-
-import { useVersions } from "@/hooks/useVersions";
+import { useRouter } from "next/navigation";
 import { useAttachments } from "@/hooks/useAttachments";
 import { AttachmentsList } from "./AttachmentsList";
 import { DragDropOverlay } from "./DragDropOverlay";
 import { FileAttachmentDropdown } from "./FileAttachmentDropdown";
-import { showExtraFilesToast } from "@/lib/toast";
-import { useSummarizeInNewChat } from "./SummarizeInNewChatButton";
+import { showError } from "@/lib/toast";
 import { ChatInputControls } from "../ChatInputControls";
 import { ChatErrorBox } from "./ChatErrorBox";
-import { AgentConsentBanner } from "./AgentConsentBanner";
-import {
-  selectedComponentsPreviewAtom,
-  previewIframeRefAtom,
-  visualEditingSelectedComponentAtom,
-  currentComponentCoordinatesAtom,
-  pendingVisualChangesAtom,
-} from "@/atoms/previewAtoms";
-import { SelectedComponentsDisplay } from "./SelectedComponentDisplay";
-import { useCheckProblems } from "@/hooks/useCheckProblems";
+import { selectedComponentPreviewAtom } from "@/atoms/previewAtoms";
+import { SelectedComponentDisplay } from "./SelectedComponentDisplay";
+// import { useCheckProblems } from "@/hooks/useCheckProblems";
 import { LexicalChatInput } from "./LexicalChatInput";
 import { useChatModeToggle } from "@/hooks/useChatModeToggle";
-import { VisualEditingChangesDialog } from "@/components/preview_panel/VisualEditingChangesDialog";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
-import { useQueryClient } from "@tanstack/react-query";
-import { TOKEN_COUNT_QUERY_KEY } from "@/hooks/useCountTokens";
+// import { openExternalUrl } from "@/utils/openExternalUrl";
 
 const showTokenBarAtom = atom(false);
 
 export function ChatInput({ chatId }: { chatId?: number }) {
   const posthog = usePostHog();
+  // const queryClient = useQueryClient();
   const [inputValue, setInputValue] = useAtom(chatInputValueAtom);
   const { settings } = useSettings();
-  const appId = useAtomValue(selectedAppIdAtom);
-  const { refreshVersions } = useVersions(appId);
-  const { streamMessage, isStreaming, setIsStreaming, error, setError } =
+  // const appId = useAtomValue(selectedAppIdAtom);
+  // NOTE: As of networkInterfaces, we are not using versions in the UI
+  // const { refreshVersions } = useVersions(appId);
+  const { streamMessage, cancelStream, isStreaming, error /*, setError */ } =
     useStreamChat();
   const [showError, setShowError] = useState(true);
-  const [isApproving, setIsApproving] = useState(false); // State for approving
-  const [isRejecting, setIsRejecting] = useState(false); // State for rejecting
-  const messagesById = useAtomValue(chatMessagesByIdAtom);
-  const setMessagesById = useSetAtom(chatMessagesByIdAtom);
-  const setIsPreviewOpen = useSetAtom(isPreviewOpenAtom);
+  // const [isApproving, setIsApproving] = useState(false); // State for approving
+  // const [isRejecting, setIsRejecting] = useState(false); // State for rejecting
+  // const messagesById = useAtomValue(chatMessagesByIdAtom);
+  //const setMessagesById = useSetAtom(chatMessagesByIdAtom);
+  // const setIsPreviewOpen = useSetAtom(isPreviewOpenAtom);
   const [showTokenBar, setShowTokenBar] = useAtom(showTokenBarAtom);
-  const queryClient = useQueryClient();
-  const toggleShowTokenBar = useCallback(() => {
-    setShowTokenBar((prev) => !prev);
-    queryClient.invalidateQueries({ queryKey: TOKEN_COUNT_QUERY_KEY });
-  }, [setShowTokenBar, queryClient]);
-  const [selectedComponents, setSelectedComponents] = useAtom(
-    selectedComponentsPreviewAtom,
+  const [selectedComponent, setSelectedComponent] = useAtom(
+    selectedComponentPreviewAtom,
   );
-  const previewIframeRef = useAtomValue(previewIframeRefAtom);
-  const setVisualEditingSelectedComponent = useSetAtom(
-    visualEditingSelectedComponentAtom,
-  );
-  const setCurrentComponentCoordinates = useSetAtom(
-    currentComponentCoordinatesAtom,
-  );
-  const setPendingVisualChanges = useSetAtom(pendingVisualChangesAtom);
-  const [pendingAgentConsents, setPendingAgentConsents] = useAtom(
-    pendingAgentConsentsAtom,
-  );
-  // Get the first consent in the queue for this chat (if any)
-  const consentsForThisChat = pendingAgentConsents.filter(
-    (c) => c.chatId === chatId,
-  );
-  const pendingAgentConsent = consentsForThisChat[0] ?? null;
-  const { checkProblems } = useCheckProblems(appId);
-  const { refreshAppIframe } = useRunApp();
+  // const { checkProblems } = useCheckProblems(appId);
+
+  // Fetch chat from web API (messages loaded in ChatPanel)
+  // const { data: chatData } = useChat(chatId!);
   // Use the attachments hook
   const {
     attachments,
@@ -142,39 +116,27 @@ export function ChatInput({ chatId }: { chatId?: number }) {
     proposalResult,
     isLoading: isProposalLoading,
     error: proposalError,
-    refreshProposal,
+    // refreshProposal,
   } = useProposal(chatId);
-  const { proposal, messageId } = proposalResult ?? {};
+  //const { proposal, messageId } = proposalResult ?? {};
+  // const { messageId } = proposalResult ?? {};
   useChatModeToggle();
 
-  const lastMessage = (chatId ? (messagesById.get(chatId) ?? []) : []).at(-1);
-  const disableSendButton =
-    settings?.selectedChatMode !== "local-agent" &&
-    lastMessage?.role === "assistant" &&
-    !lastMessage.approvalState &&
-    !!proposal &&
-    proposal.type === "code-proposal" &&
-    messageId === lastMessage.id;
-
-  const { userBudget } = useUserBudgetInfo();
+  //const lastMessage = (chatId ? (messagesById.get(chatId) ?? []) : []).at(-1);
+  // NOTE: Bypass proposal approval/rejection as of now - always enable send button
+  const disableSendButton = false;
+  // const disableSendButton =
+  //   lastMessage?.role === "assistant" &&
+  //   !lastMessage.approvalState &&
+  //   !!proposal &&
+  //   proposal.type === "code-proposal" &&
+  //   messageId === lastMessage.id;
 
   useEffect(() => {
     if (error) {
       setShowError(true);
     }
   }, [error]);
-
-  const fetchChatMessages = useCallback(async () => {
-    if (!chatId) {
-      return;
-    }
-    const chat = await IpcClient.getInstance().getChat(chatId);
-    setMessagesById((prev) => {
-      const next = new Map(prev);
-      next.set(chatId, chat.messages);
-      return next;
-    });
-  }, [chatId, setMessagesById]);
 
   const handleSubmit = async () => {
     if (
@@ -187,105 +149,132 @@ export function ChatInput({ chatId }: { chatId?: number }) {
 
     const currentInput = inputValue;
     setInputValue("");
-
-    // Use all selected components for multi-component editing
-    const componentsToSend =
-      selectedComponents && selectedComponents.length > 0
-        ? selectedComponents
-        : [];
-    setSelectedComponents([]);
-    setVisualEditingSelectedComponent(null);
-    // Clear overlays in the preview iframe
-    if (previewIframeRef?.contentWindow) {
-      previewIframeRef.contentWindow.postMessage(
-        { type: "clear-dyad-component-overlays" },
-        "*",
-      );
-    }
+    setSelectedComponent(null);
 
     // Send message with attachments and clear them after sending
-    await streamMessage({
-      prompt: currentInput,
-      chatId,
-      attachments,
-      redo: false,
-      selectedComponents: componentsToSend,
-    });
+    try {
+      await streamMessage({
+        prompt: currentInput,
+        chatId,
+        attachments,
+        redo: false,
+        selectedComponent,
+      });
+    } catch (error) {
+      console.error("[ChatInput] streamMessage error:", error);
+    }
+
     clearAttachments();
     posthog.capture("chat:submit");
   };
 
   const handleCancel = () => {
     if (chatId) {
-      IpcClient.getInstance().cancelChatStream(chatId);
+      cancelStream(chatId);
     }
-    setIsStreaming(false);
   };
 
   const dismissError = () => {
     setShowError(false);
   };
 
-  const handleApprove = async () => {
-    if (!chatId || !messageId || isApproving || isRejecting || isStreaming)
-      return;
-    console.log(
-      `Approving proposal for chatId: ${chatId}, messageId: ${messageId}`,
-    );
-    setIsApproving(true);
-    posthog.capture("chat:approve");
-    try {
-      const result = await IpcClient.getInstance().approveProposal({
-        chatId,
-        messageId,
-      });
-      if (result.extraFiles) {
-        showExtraFilesToast({
-          files: result.extraFiles,
-          error: result.extraFilesError,
-          posthog,
-        });
-      }
-    } catch (err) {
-      console.error("Error approving proposal:", err);
-      setError((err as Error)?.message || "An error occurred while approving");
-    } finally {
-      setIsApproving(false);
-      setIsPreviewOpen(true);
-      refreshVersions();
-      if (settings?.enableAutoFixProblems) {
-        checkProblems();
-      }
+  // // NOTE: Proposal parser at client side - Apply files using client-side parser and API
+  // const handleApprove = async () => {
+  //   if (!chatId || !messageId || isApproving || isRejecting || isStreaming) {
+  //     return;
+  //   }
 
-      // Keep same as handleReject
-      refreshProposal();
-      fetchChatMessages();
-    }
-  };
+  //   setIsApproving(true);
+  //   posthog.capture("chat:approve");
 
-  const handleReject = async () => {
-    if (!chatId || !messageId || isApproving || isRejecting || isStreaming)
-      return;
-    console.log(
-      `Rejecting proposal for chatId: ${chatId}, messageId: ${messageId}`,
-    );
-    setIsRejecting(true);
-    posthog.capture("chat:reject");
-    try {
-      await IpcClient.getInstance().rejectProposal({
-        chatId,
-        messageId,
-      });
-    } catch (err) {
-      console.error("Error rejecting proposal:", err);
-      setError((err as Error)?.message || "An error occurred while rejecting");
-    } finally {
-      setIsRejecting(false);
-      // Keep same as handleApprove
-      refreshProposal();
-      fetchChatMessages();
-    }
-  };
+  //   try {
+
+  //     // NOTE: Proposal parser at client side - Get appId from chat data
+  //     const chat = await chatsApi.get(chatId);
+  //     const currentAppId = chat.appId;
+
+  //     if (!currentAppId) {
+  //       throw new Error("Could not determine app ID from chat");
+  //     }
+
+  //     // Get the message content
+  //     const messages = await chatsApi.getMessages(chatId);
+  //     const message = messages.find((m) => m.id === messageId);
+
+  //     if (!message) {
+  //       throw new Error("Message not found");
+  //     }
+
+  //     // NOTE: Proposal parser at client side - Apply files using client-side parser
+  //     const { applyProposal } = await import("@/lib/proposal-applier");
+  //     const result = await applyProposal(currentAppId, message.content);
+
+  //     if (!result.success) {
+  //       throw new Error(`Failed to apply changes: ${result.errors.join(", ")}`);
+  //     }
+
+  //     // NOTE: Proposal parser at client side - Update message approval state in backend (optional)
+  //     try {
+  //       await chatsApi.approveProposal(chatId, messageId);
+  //     } catch (backendErr) {
+  //       console.warn("[ChatInput] Failed to update backend approval state (non-critical):", backendErr);
+  //       // Continue anyway - files are already written
+  //     }
+
+  //   } catch (err) {
+  //     console.error("[ChatInput] Error approving proposal:", err);
+  //     setError((err as Error)?.message || "An error occurred while approving");
+  //     return; // Exit early on error, don't refresh UI
+  //   } finally {
+  //     setIsApproving(false);
+  //   }
+
+  //   // NOTE: Proposal parser at client side - Refresh UI to show applied changes
+  //   setIsPreviewOpen(true);
+  //   // refreshVersions();
+  //   if (settings?.enableAutoFixProblems) {
+  //     checkProblems();
+  //   }
+
+  //   // NOTE: Proposal parser at client side - Invalidate app query to refresh file list
+  //   const currentAppId = appId || chatData?.appId;
+  //   if (currentAppId) {
+  //     await invalidateAppQuery(queryClient, { appId: currentAppId });
+
+  //     // Give React time to process the state update
+  //     await new Promise(resolve => setTimeout(resolve, 100));
+  //   }
+
+  //   // Refresh data
+  //   refreshProposal();
+  //   if (chatId) {
+  //     queryClient.invalidateQueries({ queryKey: [...chatsKeys.detail(chatId), 'messages'] });
+  //   }
+  // };
+
+  // NOTE: Proposal parser at client side
+  // const handleReject = async () => {
+  // if (!chatId || !messageId || isApproving || isRejecting || isStreaming) {
+  //     return;
+  //   }
+  //   setIsRejecting(true);
+  //   posthog.capture("chat:reject");
+  //   try {
+  //     // NOTE: Proposal parser at client side - Update rejection state in backend
+  //     await chatsApi.rejectProposal(chatId, messageId);
+  //   } catch (err) {
+  //     console.error("[ChatInput] Error rejecting proposal:", err);
+  //     // NOTE: Proposal parser at client side - Show error but don't block (backend might not have endpoint yet)
+  //     console.warn("[ChatInput] Backend rejection failed (non-critical):", err);
+  //   } finally {
+  //     setIsRejecting(false);
+  //     // Refresh to update UI
+  //     refreshProposal();
+  //     if (chatId) {
+  //       queryClient.invalidateQueries({ queryKey: [...chatsKeys.detail(chatId), 'messages'] });
+  //     }
+  //   }
+  // };
 
   if (!settings) {
     return null; // Or loading state
@@ -308,7 +297,7 @@ export function ChatInput({ chatId }: { chatId?: number }) {
       )}
       {proposalError && (
         <div className="p-4 text-sm text-red-600">
-          Error loading proposal: {proposalError.message}
+          Error loading proposal: {proposalError}
         </div>
       )}
       <div className="p-4" data-testid="chat-input-container">
@@ -320,43 +309,12 @@ export function ChatInput({ chatId }: { chatId?: number }) {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Show agent consent banner if there's a pending consent request */}
-          {pendingAgentConsent && (
-            <AgentConsentBanner
-              consent={pendingAgentConsent}
-              queueTotal={consentsForThisChat.length}
-              onDecision={(decision) => {
-                IpcClient.getInstance().respondToAgentConsentRequest({
-                  requestId: pendingAgentConsent.requestId,
-                  decision,
-                });
-                // Remove this consent from the queue by requestId
-                setPendingAgentConsents((prev) =>
-                  prev.filter(
-                    (c) => c.requestId !== pendingAgentConsent.requestId,
-                  ),
-                );
-              }}
-              onClose={() => {
-                IpcClient.getInstance().respondToAgentConsentRequest({
-                  requestId: pendingAgentConsent.requestId,
-                  decision: "decline",
-                });
-                // Remove this consent from the queue by requestId
-                setPendingAgentConsents((prev) =>
-                  prev.filter(
-                    (c) => c.requestId !== pendingAgentConsent.requestId,
-                  ),
-                );
-              }}
-            />
-          )}
-          {/* Only render ChatInputActions if proposal is loaded and no pending consent */}
-          {!pendingAgentConsent &&
-            proposal &&
+          {/* NOTE: Bypass proposal approval/rejection as of now */}
+          {/* NOTE: Proposal parser at client side - Show approval UI */}
+          {/* Only render ChatInputActions if proposal is loaded */}
+          {/* {proposal &&
             proposalResult?.chatId === chatId &&
-            settings.selectedChatMode !== "ask" &&
-            settings.selectedChatMode !== "local-agent" && (
+            settings.selectedChatMode !== "ask" && (
               <ChatInputActions
                 proposal={proposal}
                 onApprove={handleApprove}
@@ -371,62 +329,12 @@ export function ChatInput({ chatId }: { chatId?: number }) {
                 }
                 isApproving={isApproving}
                 isRejecting={isRejecting}
+                approvalState={messages.find((m) => m.id === messageId)?.approvalState || null}
+                approvalTimestamp={messages.find((m) => m.id === messageId)?.createdAt}
               />
-            )}
+            )} */}
 
-          {userBudget ? (
-            <VisualEditingChangesDialog
-              iframeRef={
-                previewIframeRef
-                  ? { current: previewIframeRef }
-                  : { current: null }
-              }
-              onReset={() => {
-                // Exit component selection mode and visual editing
-                setSelectedComponents([]);
-                setVisualEditingSelectedComponent(null);
-                setCurrentComponentCoordinates(null);
-                setPendingVisualChanges(new Map());
-                refreshAppIframe();
-
-                // Deactivate component selector in iframe
-                if (previewIframeRef?.contentWindow) {
-                  previewIframeRef.contentWindow.postMessage(
-                    { type: "deactivate-dyad-component-selector" },
-                    "*",
-                  );
-                }
-              }}
-            />
-          ) : (
-            selectedComponents.length > 0 && (
-              <div className="border-b border-border p-3 bg-muted/30">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          IpcClient.getInstance().openExternalUrl(
-                            "https://dyad.sh/pro",
-                          );
-                        }}
-                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                      >
-                        <Lock size={16} />
-                        <span className="font-medium">Visual editor (Pro)</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Visual editing lets you make UI changes without AI and is
-                      a Pro-only feature
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            )
-          )}
-
-          <SelectedComponentsDisplay />
+          <SelectedComponentDisplay />
 
           {/* Use the AttachmentsList component */}
           <AttachmentsList
@@ -445,7 +353,6 @@ export function ChatInput({ chatId }: { chatId?: number }) {
               onPaste={handlePaste}
               placeholder="Ask Dyad to build..."
               excludeCurrentApp={true}
-              disableSendButton={disableSendButton}
             />
 
             {isStreaming ? (
@@ -484,7 +391,7 @@ export function ChatInput({ chatId }: { chatId?: number }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    onClick={toggleShowTokenBar}
+                    onClick={() => setShowTokenBar(!showTokenBar)}
                     variant="ghost"
                     className={`has-[>svg]:px-2 ${
                       showTokenBar ? "text-purple-500 bg-purple-100" : ""
@@ -539,10 +446,30 @@ function SuggestionButton({
 }
 
 function SummarizeInNewChatButton() {
-  const { handleSummarize } = useSummarizeInNewChat();
+  const chatId = useAtomValue(selectedChatIdAtom);
+  const appId = useAtomValue(selectedAppIdAtom);
+  const { streamMessage } = useStreamChat();
+  const router = useRouter();
+  const onClick = async () => {
+    if (!appId) {
+      console.error("No app id found");
+      return;
+    }
+    try {
+      const chat = await chatsApi.create({ appId });
+      // navigate to new chat
+      router.push(`/${appId}/chat?id=${chat.id}`);
+      await streamMessage({
+        prompt: "Summarize from chat-id=" + chatId,
+        chatId: chat.id,
+      });
+    } catch (err) {
+      showError(err);
+    }
+  };
   return (
     <SuggestionButton
-      onClick={handleSummarize}
+      onClick={onClick}
       tooltipText="Creating a new chat makes the AI more focused and efficient"
     >
       Summarize to new chat
@@ -723,346 +650,374 @@ interface ChatInputActionsProps {
   isApprovable: boolean; // Can be used to enable/disable buttons
   isApproving: boolean; // State for approving
   isRejecting: boolean; // State for rejecting
+  approvalState: "approved" | "rejected" | null;
+  approvalTimestamp?: Date;
 }
 
 // Update ChatInputActions to accept props
-function ChatInputActions({
-  proposal,
-  onApprove,
-  onReject,
-  isApprovable,
-  isApproving,
-  isRejecting,
-}: ChatInputActionsProps) {
-  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+// function _ChatInputActions({
+//   proposal,
+//   onApprove,
+//   onReject,
+//   isApprovable,
+//   isApproving,
+//   isRejecting,
+//   approvalState,
+//   approvalTimestamp,
+// }: ChatInputActionsProps) {
+//   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
 
-  if (proposal.type === "tip-proposal") {
-    return <div>Tip proposal</div>;
-  }
-  if (proposal.type === "action-proposal") {
-    return <ActionProposalActions proposal={proposal}></ActionProposalActions>;
-  }
+//   if (proposal.type === "tip-proposal") {
+//     return <div>Tip proposal</div>;
+//   }
+//   if (proposal.type === "action-proposal") {
+//     return <ActionProposalActions proposal={proposal}></ActionProposalActions>;
+//   }
 
-  // Split files into server functions and other files - only for CodeProposal
-  const serverFunctions =
-    proposal.filesChanged?.filter((f: FileChange) => f.isServerFunction) ?? [];
-  const otherFilesChanged =
-    proposal.filesChanged?.filter((f: FileChange) => !f.isServerFunction) ?? [];
+//   // Split files into server functions and other files - only for CodeProposal
+//   const serverFunctions =
+//     proposal.filesChanged?.filter((f: FileChange) => f.isServerFunction) ?? [];
+//   const otherFilesChanged =
+//     proposal.filesChanged?.filter((f: FileChange) => !f.isServerFunction) ?? [];
 
-  function formatTitle({
-    title,
-    isDetailsVisible,
-  }: {
-    title: string;
-    isDetailsVisible: boolean;
-  }) {
-    if (isDetailsVisible) {
-      return title;
-    }
-    return title.slice(0, 60) + "...";
-  }
+//   function formatTitle({
+//     title,
+//     isDetailsVisible,
+//   }: {
+//     title: string;
+//     isDetailsVisible: boolean;
+//   }) {
+//     if (isDetailsVisible) {
+//       return title;
+//     }
+//     return title.slice(0, 60) + "...";
+//   }
 
-  return (
-    <div className="border-b border-border">
-      <div className="p-2">
-        {/* Row 1: Title, Expand Icon, and Security Chip */}
-        <div className="flex items-center gap-2 mb-1">
-          <button
-            className="flex flex-col text-left text-sm hover:bg-muted p-1 rounded justify-start w-full"
-            onClick={() => setIsDetailsVisible(!isDetailsVisible)}
-          >
-            <div className="flex items-center">
-              {isDetailsVisible ? (
-                <ChevronUp size={16} className="mr-1 flex-shrink-0" />
-              ) : (
-                <ChevronDown size={16} className="mr-1 flex-shrink-0" />
-              )}
-              <span className="font-medium">
-                {formatTitle({ title: proposal.title, isDetailsVisible })}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground ml-6">
-              <ProposalSummary
-                sqlQueries={proposal.sqlQueries}
-                serverFunctions={serverFunctions}
-                packagesAdded={proposal.packagesAdded}
-                filesChanged={otherFilesChanged}
-              />
-            </div>
-          </button>
-          {proposal.securityRisks.length > 0 && (
-            <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0">
-              Security risks found
-            </span>
-          )}
-        </div>
+//   return (
+//     <div className="border-b border-border">
+//       <div className="p-2">
+//         {/* Row 1: Title, Expand Icon, and Security Chip */}
+//         <div className="flex items-center gap-2 mb-1">
+//           <button
+//             className="flex flex-col text-left text-sm hover:bg-muted p-1 rounded justify-start w-full"
+//             onClick={() => setIsDetailsVisible(!isDetailsVisible)}
+//           >
+//             <div className="flex items-center">
+//               {isDetailsVisible ? (
+//                 <ChevronUp size={16} className="mr-1 flex-shrink-0" />
+//               ) : (
+//                 <ChevronDown size={16} className="mr-1 flex-shrink-0" />
+//               )}
+//               <span className="font-medium">
+//                 {formatTitle({ title: proposal.title, isDetailsVisible })}
+//               </span>
+//             </div>
+//             <div className="text-xs text-muted-foreground ml-6">
+//               <ProposalSummary
+//                 sqlQueries={proposal.sqlQueries}
+//                 serverFunctions={serverFunctions}
+//                 packagesAdded={proposal.packagesAdded}
+//                 filesChanged={otherFilesChanged}
+//               />
+//             </div>
+//           </button>
+//           {proposal.securityRisks.length > 0 && (
+//             <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0">
+//               Security risks found
+//             </span>
+//           )}
+//         </div>
 
-        {/* Row 2: Buttons and Toggle */}
-        <div className="flex items-center justify-start space-x-2">
-          <Button
-            className="px-8"
-            size="sm"
-            variant="outline"
-            onClick={onApprove}
-            disabled={!isApprovable || isApproving || isRejecting}
-            data-testid="approve-proposal-button"
-          >
-            {isApproving ? (
-              <Loader2 size={16} className="mr-1 animate-spin" />
-            ) : (
-              <Check size={16} className="mr-1" />
-            )}
-            Approve
-          </Button>
-          <Button
-            className="px-8"
-            size="sm"
-            variant="outline"
-            onClick={onReject}
-            disabled={!isApprovable || isApproving || isRejecting}
-            data-testid="reject-proposal-button"
-          >
-            {isRejecting ? (
-              <Loader2 size={16} className="mr-1 animate-spin" />
-            ) : (
-              <X size={16} className="mr-1" />
-            )}
-            Reject
-          </Button>
-          <div className="flex items-center space-x-1 ml-auto">
-            <AutoApproveSwitch />
-          </div>
-        </div>
-      </div>
+//         {/* Row 2: Buttons/Status and Toggle */}
+//         <div className="flex items-center justify-start space-x-2">
+//           {approvalState ? (
+//             // Show approval status if already approved/rejected
+//             <div className="flex items-center space-x-2 text-sm">
+//               <span className={`font-medium ${
+//                 approvalState === 'approved' ? 'text-green-600' : 'text-red-600'
+//               }`}>
+//                 {approvalState === 'approved' ? 'Approved' : 'Rejected'}
+//               </span>
+//               {approvalTimestamp && (
+//                 <span className="text-muted-foreground text-xs">
+//                   {new Date(approvalTimestamp).toLocaleString('en-US', {
+//                     month: 'short',
+//                     day: 'numeric',
+//                     year: 'numeric',
+//                     hour: 'numeric',
+//                     minute: '2-digit',
+//                     hour12: true
+//                   })}
+//                 </span>
+//               )}
+//             </div>
+//           ) : (
+//             // Show approve/reject buttons if not yet decided
+//             <>
+//               <Button
+//                 className="px-8"
+//                 size="sm"
+//                 variant="outline"
+//                 onClick={onApprove}
+//                 disabled={!isApprovable || isApproving || isRejecting}
+//                 data-testid="approve-proposal-button"
+//               >
+//                 {isApproving ? (
+//                   <Loader2 size={16} className="mr-1 animate-spin" />
+//                 ) : (
+//                   <Check size={16} className="mr-1" />
+//                 )}
+//                 Approve
+//               </Button>
+//               <Button
+//                 className="px-8"
+//                 size="sm"
+//                 variant="outline"
+//                 onClick={onReject}
+//                 disabled={!isApprovable || isApproving || isRejecting}
+//                 data-testid="reject-proposal-button"
+//               >
+//                 {isRejecting ? (
+//                   <Loader2 size={16} className="mr-1 animate-spin" />
+//                 ) : (
+//                   <X size={16} className="mr-1" />
+//                 )}
+//                 Reject
+//               </Button>
+//             </>
+//           )}
+//           <div className="flex items-center space-x-1 ml-auto">
+//             <AutoApproveSwitch />
+//           </div>
+//         </div>
+//       </div>
 
-      <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
-        {isDetailsVisible && (
-          <div className="p-3 border-t border-border bg-muted/50 text-sm">
-            {!!proposal.securityRisks.length && (
-              <div className="mb-3">
-                <h4 className="font-semibold mb-1">Security Risks</h4>
-                <ul className="space-y-1">
-                  {proposal.securityRisks.map((risk, index) => (
-                    <li key={index} className="flex items-start space-x-2">
-                      {risk.type === "warning" ? (
-                        <AlertTriangle
-                          size={16}
-                          className="text-yellow-500 mt-0.5 flex-shrink-0"
-                        />
-                      ) : (
-                        <AlertOctagon
-                          size={16}
-                          className="text-red-500 mt-0.5 flex-shrink-0"
-                        />
-                      )}
-                      <div>
-                        <span className="font-medium">{risk.title}:</span>{" "}
-                        <span>{risk.description}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+//       <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
+//         {isDetailsVisible && (
+//           <div className="p-3 border-t border-border bg-muted/50 text-sm">
+//             {!!proposal.securityRisks.length && (
+//               <div className="mb-3">
+//                 <h4 className="font-semibold mb-1">Security Risks</h4>
+//                 <ul className="space-y-1">
+//                   {proposal.securityRisks.map((risk, index) => (
+//                     <li key={index} className="flex items-start space-x-2">
+//                       {risk.type === "warning" ? (
+//                         <AlertTriangle
+//                           size={16}
+//                           className="text-yellow-500 mt-0.5 flex-shrink-0"
+//                         />
+//                       ) : (
+//                         <AlertOctagon
+//                           size={16}
+//                           className="text-red-500 mt-0.5 flex-shrink-0"
+//                         />
+//                       )}
+//                       <div>
+//                         <span className="font-medium">{risk.title}:</span>{" "}
+//                         <span>{risk.description}</span>
+//                       </div>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             )}
 
-            {proposal.sqlQueries?.length > 0 && (
-              <div className="mb-3">
-                <h4 className="font-semibold mb-1">SQL Queries</h4>
-                <ul className="space-y-2">
-                  {proposal.sqlQueries.map((query, index) => (
-                    <SqlQueryItem key={index} query={query} />
-                  ))}
-                </ul>
-              </div>
-            )}
+//             {proposal.sqlQueries?.length > 0 && (
+//               <div className="mb-3">
+//                 <h4 className="font-semibold mb-1">SQL Queries</h4>
+//                 <ul className="space-y-2">
+//                   {proposal.sqlQueries.map((query, index) => (
+//                     <SqlQueryItem key={index} query={query} />
+//                   ))}
+//                 </ul>
+//               </div>
+//             )}
 
-            {proposal.packagesAdded?.length > 0 && (
-              <div className="mb-3">
-                <h4 className="font-semibold mb-1">Packages Added</h4>
-                <ul className="space-y-1">
-                  {proposal.packagesAdded.map((pkg, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center space-x-2"
-                      onClick={() => {
-                        IpcClient.getInstance().openExternalUrl(
-                          `https://www.npmjs.com/package/${pkg}`,
-                        );
-                      }}
-                    >
-                      <Package
-                        size={16}
-                        className="text-muted-foreground flex-shrink-0"
-                      />
-                      <span className="cursor-pointer text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                        {pkg}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+//             {proposal.packagesAdded?.length > 0 && (
+//               <div className="mb-3">
+//                 <h4 className="font-semibold mb-1">Packages Added</h4>
+//                 <ul className="space-y-1">
+//                   {proposal.packagesAdded.map((pkg, index) => (
+//                     <li
+//                       key={index}
+//                       className="flex items-center space-x-2"
+//                       onClick={() => {
+//                         openExternalUrl(`https://www.npmjs.com/package/${pkg}`);
+//                       }}
+//                     >
+//                       <Package
+//                         size={16}
+//                         className="text-muted-foreground flex-shrink-0"
+//                       />
+//                       <span className="cursor-pointer text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+//                         {pkg}
+//                       </span>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             )}
 
-            {serverFunctions.length > 0 && (
-              <div className="mb-3">
-                <h4 className="font-semibold mb-1">Server Functions Changed</h4>
-                <ul className="space-y-1">
-                  {serverFunctions.map((file: FileChange, index: number) => (
-                    <li key={index} className="flex items-center space-x-2">
-                      {getIconForFileChange(file)}
-                      <span
-                        title={file.path}
-                        className="truncate cursor-default"
-                      >
-                        {file.name}
-                      </span>
-                      <span className="text-muted-foreground text-xs truncate">
-                        - {file.summary}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+//             {serverFunctions.length > 0 && (
+//               <div className="mb-3">
+//                 <h4 className="font-semibold mb-1">Server Functions Changed</h4>
+//                 <ul className="space-y-1">
+//                   {serverFunctions.map((file: FileChange, index: number) => (
+//                     <li key={index} className="flex items-center space-x-2">
+//                       {getIconForFileChange(file)}
+//                       <span
+//                         title={file.path}
+//                         className="truncate cursor-default"
+//                       >
+//                         {file.name}
+//                       </span>
+//                       <span className="text-muted-foreground text-xs truncate">
+//                         - {file.summary}
+//                       </span>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             )}
 
-            {otherFilesChanged.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-1">Files Changed</h4>
-                <ul className="space-y-1">
-                  {otherFilesChanged.map((file: FileChange, index: number) => (
-                    <li key={index} className="flex items-center space-x-2">
-                      {getIconForFileChange(file)}
-                      <span
-                        title={file.path}
-                        className="truncate cursor-default"
-                      >
-                        {file.name}
-                      </span>
-                      <span className="text-muted-foreground text-xs truncate">
-                        - {file.summary}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+//             {otherFilesChanged.length > 0 && (
+//               <div>
+//                 <h4 className="font-semibold mb-1">Files Changed</h4>
+//                 <ul className="space-y-1">
+//                   {otherFilesChanged.map((file: FileChange, index: number) => (
+//                     <li key={index} className="flex items-center space-x-2">
+//                       {getIconForFileChange(file)}
+//                       <span
+//                         title={file.path}
+//                         className="truncate cursor-default"
+//                       >
+//                         {file.name}
+//                       </span>
+//                       <span className="text-muted-foreground text-xs truncate">
+//                         - {file.summary}
+//                       </span>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               </div>
+//             )}
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
 
-function getIconForFileChange(file: FileChange) {
-  switch (file.type) {
-    case "write":
-      return (
-        <FileText size={16} className="text-muted-foreground flex-shrink-0" />
-      );
-    case "rename":
-      return (
-        <SendToBack size={16} className="text-muted-foreground flex-shrink-0" />
-      );
-    case "delete":
-      return (
-        <FileX size={16} className="text-muted-foreground flex-shrink-0" />
-      );
-  }
-}
+// function getIconForFileChange(file: FileChange) {
+//   switch (file.type) {
+//     case "write":
+//       return (
+//         <FileText size={16} className="text-muted-foreground flex-shrink-0" />
+//       );
+//     case "rename":
+//       return (
+//         <SendToBack size={16} className="text-muted-foreground flex-shrink-0" />
+//       );
+//     case "delete":
+//       return (
+//         <FileX size={16} className="text-muted-foreground flex-shrink-0" />
+//       );
+//   }
+// }
 
 // Proposal summary component to show counts of changes
-function ProposalSummary({
-  sqlQueries = [],
-  serverFunctions = [],
-  packagesAdded = [],
-  filesChanged = [],
-}: {
-  sqlQueries?: Array<SqlQuery>;
-  serverFunctions?: FileChange[];
-  packagesAdded?: string[];
-  filesChanged?: FileChange[];
-}) {
-  // If no changes, show a simple message
-  if (
-    !sqlQueries.length &&
-    !serverFunctions.length &&
-    !packagesAdded.length &&
-    !filesChanged.length
-  ) {
-    return <span>No changes</span>;
-  }
-
-  // Build parts array with only the segments that have content
-  const parts: string[] = [];
-
-  if (sqlQueries.length) {
-    parts.push(
-      `${sqlQueries.length} SQL ${
-        sqlQueries.length === 1 ? "query" : "queries"
-      }`,
-    );
-  }
-
-  if (serverFunctions.length) {
-    parts.push(
-      `${serverFunctions.length} Server ${
-        serverFunctions.length === 1 ? "Function" : "Functions"
-      }`,
-    );
-  }
-
-  if (packagesAdded.length) {
-    parts.push(
-      `${packagesAdded.length} ${
-        packagesAdded.length === 1 ? "package" : "packages"
-      }`,
-    );
-  }
-
-  if (filesChanged.length) {
-    parts.push(
-      `${filesChanged.length} ${filesChanged.length === 1 ? "file" : "files"}`,
-    );
-  }
-
-  // Join all parts with separator
-  return <span>{parts.join(" | ")}</span>;
-}
+// function ProposalSummary({
+//   sqlQueries = [],
+//   serverFunctions = [],
+//   packagesAdded = [],
+//   filesChanged = [],
+// }: {
+//   sqlQueries?: Array<SqlQuery>;
+//   serverFunctions?: FileChange[];
+//   packagesAdded?: string[];
+//   filesChanged?: FileChange[];
+// }) {
+//   // If no changes, show a simple message
+//   if (
+//     !sqlQueries.length &&
+//     !serverFunctions.length &&
+//     !packagesAdded.length &&
+//     !filesChanged.length
+//   ) {
+//     return <span>No changes</span>;
+//   }
+//
+//   // Build parts array with only the segments that have content
+//   const parts: string[] = [];
+//
+//   if (sqlQueries.length) {
+//     parts.push(
+//       `${sqlQueries.length} SQL ${
+//         sqlQueries.length === 1 ? "query" : "queries"
+//       }`,
+//     );
+//   }
+//
+//   if (serverFunctions.length) {
+//     parts.push(
+//       `${serverFunctions.length} Server ${
+//         serverFunctions.length === 1 ? "Function" : "Functions"
+//       }`,
+//     );
+//   }
+//
+//   if (packagesAdded.length) {
+//     parts.push(
+//       `${packagesAdded.length} ${
+//         packagesAdded.length === 1 ? "package" : "packages"
+//       }`,
+//     );
+//   }
+//
+//   if (filesChanged.length) {
+//     parts.push(
+//       `${filesChanged.length} ${filesChanged.length === 1 ? "file" : "files"}`,
+//     );
+//   }
+//
+//   // Join all parts with separator
+//   return <span>{parts.join(" | ")}</span>;
+// }
 
 // SQL Query item with expandable functionality
-function SqlQueryItem({ query }: { query: SqlQuery }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const queryContent = query.content;
-  const queryDescription = query.description;
-
-  return (
-    <li
-      className="bg-(--background-lightest) hover:bg-(--background-lighter) rounded-lg px-3 py-2 border border-border cursor-pointer"
-      onClick={() => setIsExpanded(!isExpanded)}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Database size={16} className="text-muted-foreground flex-shrink-0" />
-          <span className="text-sm font-medium">
-            {queryDescription || "SQL Query"}
-          </span>
-        </div>
-        <div>
-          {isExpanded ? (
-            <ChevronsDownUp size={18} className="text-muted-foreground" />
-          ) : (
-            <ChevronsUpDown size={18} className="text-muted-foreground" />
-          )}
-        </div>
-      </div>
-      {isExpanded && (
-        <div className="mt-2 text-xs max-h-[200px] overflow-auto">
-          <CodeHighlight className="language-sql ">
-            {queryContent}
-          </CodeHighlight>
-        </div>
-      )}
-    </li>
-  );
-}
+// function SqlQueryItem({ query }: { query: SqlQuery }) {
+//   const [isExpanded, setIsExpanded] = useState(false);
+//
+//   const queryContent = query.content;
+//   const queryDescription = query.description;
+//
+//   return (
+//     <li
+//       className="bg-(--background-lightest) hover:bg-(--background-lighter) rounded-lg px-3 py-2 border border-border cursor-pointer"
+//       onClick={() => setIsExpanded(!isExpanded)}
+//     >
+//       <div className="flex items-center justify-between">
+//         <div className="flex items-center gap-2">
+//           <Database size={16} className="text-muted-foreground flex-shrink-0" />
+//           <span className="text-sm font-medium">
+//             {queryDescription || "SQL Query"}
+//           </span>
+//         </div>
+//         <div>
+//           {isExpanded ? (
+//             <ChevronsDownUp size={18} className="text-muted-foreground" />
+//           ) : (
+//             <ChevronsUpDown size={18} className="text-muted-foreground" />
+//           )}
+//         </div>
+//       </div>
+//       {isExpanded && (
+//         <div className="mt-2 text-xs max-h-[200px] overflow-auto">
+//           <CodeHighlight className="language-sql ">
+//             {queryContent}
+//           </CodeHighlight>
+//         </div>
+//       )}
+//     </li>
+//   );
+// }

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 import {
   ChevronsDownUp,
@@ -5,7 +6,7 @@ import {
   AlertTriangle,
   FileText,
 } from "lucide-react";
-import type { Problem } from "@/ipc/ipc_types";
+import type { ProblemReport as Problem } from "@/types/ipc_types";
 
 type ProblemWithoutSnippet = Omit<Problem, "snippet">;
 

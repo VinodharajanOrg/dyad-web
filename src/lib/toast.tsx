@@ -1,20 +1,30 @@
+"use client";
 import { toast } from "sonner";
 import { PostHog } from "posthog-js";
 import React from "react";
 import { CustomErrorToast } from "../components/CustomErrorToast";
+import { CustomSuccessToast } from "../components/CustomSuccessToast";
+import { CustomWarningToast } from "../components/CustomWarningToast";
+import { CustomInfoToast } from "../components/CustomInfoToast";
 import { InputRequestToast } from "../components/InputRequestToast";
 import { McpConsentToast } from "../components/McpConsentToast";
 
 /**
  * Toast utility functions for consistent notifications across the app
+ * Toasts stack vertically when multiple are shown together
  */
 
 /**
  * Show a success toast
  * @param message The message to display
+ * @param duration Duration in milliseconds (default: 5000)
  */
-export const showSuccess = (message: string) => {
-  toast.success(message);
+export const showSuccess = (message: string, duration: number = 5000) => {
+  const toastId = toast.custom(
+    (t) => <CustomSuccessToast message={message} toastId={t} />,
+    { duration },
+  );
+  return toastId;
 };
 
 /**
@@ -75,18 +85,28 @@ export const showError = (message: any) => {
 /**
  * Show a warning toast
  * @param message The warning message to display
+ * @param duration Duration in milliseconds (default: 5000)
  */
-export const showWarning = (message: string) => {
-  toast.warning(message);
+export const showWarning = (message: string, duration: number = 5000) => {
   console.warn(message);
+  const toastId = toast.custom(
+    (t) => <CustomWarningToast message={message} toastId={t} />,
+    { duration },
+  );
+  return toastId;
 };
 
 /**
  * Show an info toast
  * @param message The info message to display
+ * @param duration Duration in milliseconds (default: 5000)
  */
-export const showInfo = (message: string) => {
-  toast.info(message);
+export const showInfo = (message: string, duration: number = 5000) => {
+  const toastId = toast.custom(
+    (t) => <CustomInfoToast message={message} toastId={t} />,
+    { duration },
+  );
+  return toastId;
 };
 
 /**

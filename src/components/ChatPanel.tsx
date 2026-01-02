@@ -1,11 +1,14 @@
+"use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   chatMessagesByIdAtom,
   chatStreamCountByIdAtom,
   isStreamingByIdAtom,
+  // selectedChatIdAtom,
 } from "../atoms/chatAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
+// import { selectedAppIdAtom } from "@/atoms/appAtoms";
+import { useChat, useChatMessages } from "@/hooks/useChats";
 
 import { ChatHeader } from "./chat/ChatHeader";
 import { MessagesList } from "./chat/MessagesList";
@@ -26,14 +29,25 @@ export function ChatPanel({
   isPreviewOpen,
   onTogglePreview,
 }: ChatPanelProps) {
+  // Fetch chat and messages separately from web API
+  // NOTE: Only fetch if chatId is defined and stable
+  //const { data: chatData, isLoading: chatLoading } = useChat(chatId!);
+  const { data: chatData } = useChat(chatId!);
+  // const { data: messagesData = [], isFetching: _isMessagesFetching } = useChatMessages(chatId!);
+  const { data: messagesData = [] } = useChatMessages(chatId!);
   const messagesById = useAtomValue(chatMessagesByIdAtom);
   const setMessagesById = useSetAtom(chatMessagesByIdAtom);
   const [isVersionPaneOpen, setIsVersionPaneOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamCountById = useAtomValue(chatStreamCountByIdAtom);
   const isStreamingById = useAtomValue(isStreamingByIdAtom);
-  // Reference to store the processed prompt so we don't submit it twice
+  //const selectedAppId = useAtomValue(selectedAppIdAtom);
+  //const selectedChatId = useAtomValue(selectedChatIdAtom);
 
+  const messages = chatId ? (messagesById.get(chatId) ?? []) : [];
+  const isStreaming = chatId ? (isStreamingById.get(chatId) ?? false) : false;
+
+  // NOTE: Reference to store the processed prompt so we don't submit it twice
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -94,14 +108,9 @@ export function ChatPanel({
   }, []);
 
   useEffect(() => {
-    const streamCount = chatId ? (streamCountById.get(chatId) ?? 0) : 0;
-    console.log("streamCount - scrolling to bottom", streamCount);
+    //const streamCount = chatId ? (streamCountById.get(chatId) ?? 0) : 0;
     scrollToBottom();
-  }, [
-    chatId,
-    chatId ? (streamCountById.get(chatId) ?? 0) : 0,
-    chatId ? (isStreamingById.get(chatId) ?? false) : false,
-  ]);
+  }, [chatId, chatId ? (streamCountById.get(chatId) ?? 0) : 0]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -119,25 +128,53 @@ export function ChatPanel({
     };
   }, [handleScroll]);
 
-  const fetchChatMessages = useCallback(async () => {
-    if (!chatId) {
-      // no-op when no chat
-      return;
-    }
-    const chat = await IpcClient.getInstance().getChat(chatId);
+  // Sync messages data from TanStack Query to Jotai atoms
+  // NOTE: Only sync when NOT streaming and when the backend data has actually changed
+  // This prevents race conditions where the backend doesn't have the new message yet
+  useEffect(() => {
+    if (!chatId || !messagesData || isStreaming) return;
+
     setMessagesById((prev) => {
+      const currentMessages = prev.get(chatId);
+
+      // CRITICAL: If backend has fewer messages OR same length but older IDs, keep local state
+      // This prevents overwriting streamed messages that haven't been persisted yet
+      if (currentMessages && messagesData.length <= currentMessages.length) {
+        const lastCurrent = currentMessages[currentMessages.length - 1];
+        const lastNew = messagesData[messagesData.length - 1];
+
+        // If lengths are equal and IDs match, no change needed
+        if (
+          messagesData.length === currentMessages.length &&
+          lastCurrent?.id === lastNew?.id
+        ) {
+          return prev;
+        }
+
+        // If backend has fewer messages, keep local (streamed message not persisted yet)
+        if (messagesData.length < currentMessages.length) {
+          return prev;
+        }
+
+        // If same length but different last ID, backend might have newer data
+        // BUT if last local message has a temporary ID (timestamp-based), keep local
+        if (lastCurrent && lastCurrent.id > 1000000000000) {
+          return prev;
+        }
+      }
+
+      // Sync backend data to atom (backend has more/newer messages)
       const next = new Map(prev);
-      next.set(chatId, chat.messages);
+      next.set(chatId, messagesData);
       return next;
     });
-  }, [chatId, setMessagesById]);
-
-  useEffect(() => {
-    fetchChatMessages();
-  }, [fetchChatMessages]);
-
-  const messages = chatId ? (messagesById.get(chatId) ?? []) : [];
-  const isStreaming = chatId ? (isStreamingById.get(chatId) ?? false) : false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    chatId,
+    messagesData?.length,
+    messagesData?.[messagesData?.length - 1]?.id,
+    isStreaming,
+  ]);
 
   // Auto-scroll effect when messages change during streaming
   useEffect(() => {
@@ -172,6 +209,7 @@ export function ChatPanel({
                 messages={messages}
                 messagesEndRef={messagesEndRef}
                 ref={messagesContainerRef}
+                chatData={chatData}
               />
 
               {/* Scroll to bottom button */}

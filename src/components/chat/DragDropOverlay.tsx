@@ -1,3 +1,4 @@
+"use client";
 import { Paperclip } from "lucide-react";
 
 interface DragDropOverlayProps {

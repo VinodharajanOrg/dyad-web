@@ -1,5 +1,5 @@
+"use client";
 import { useSettings } from "@/hooks/useSettings";
-
 import {
   Select,
   SelectContent,
@@ -8,8 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { IpcClient } from "@/ipc/ipc_client";
 import type { ReleaseChannel } from "@/lib/schemas";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 export function ReleaseChannelSelector() {
   const { settings, updateSettings } = useSettings();
@@ -27,7 +27,7 @@ export function ReleaseChannelSelector() {
         action: {
           label: "Download Stable",
           onClick: () => {
-            IpcClient.getInstance().openExternalUrl("https://dyad.sh/download");
+            openExternalUrl("https://dyad.sh/download");
           },
         },
       });
@@ -38,7 +38,8 @@ export function ReleaseChannelSelector() {
         action: {
           label: "Restart Dyad",
           onClick: () => {
-            IpcClient.getInstance().restartDyad();
+            // NOTE: IPC client would be null in web mode
+            // IpcClient.getInstance().restartDyad();
           },
         },
       });

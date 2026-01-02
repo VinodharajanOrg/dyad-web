@@ -1,17 +1,19 @@
 import { useEffect } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom /*, useAtomValue, useSetAtom */ } from "jotai";
 import { versionsListAtom } from "@/atoms/appAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
+import { gitApi } from "@/api/endpoints/git";
+import { IpcClient } from "@/api/ipc_client";
 
-import { chatMessagesByIdAtom, selectedChatIdAtom } from "@/atoms/chatAtoms";
+// import { chatMessagesByIdAtom, selectedChatIdAtom } from "@/atoms/chatAtoms";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { RevertVersionResponse, Version } from "@/ipc/ipc_types";
+import type { RevertVersionResponse, Version } from "@/types/ipc_types";
 import { toast } from "sonner";
 
+// NOTE: Replace IPC with REST - Use Git REST API for listing versions
 export function useVersions(appId: number | null) {
   const [, setVersionsAtom] = useAtom(versionsListAtom);
-  const selectedChatId = useAtomValue(selectedChatIdAtom);
-  const setMessagesById = useSetAtom(chatMessagesByIdAtom);
+  //const selectedChatId = useAtomValue(selectedChatIdAtom);
+  //const setMessagesById = useSetAtom(chatMessagesByIdAtom);
   const queryClient = useQueryClient();
 
   const {
@@ -25,12 +27,33 @@ export function useVersions(appId: number | null) {
       if (appId === null) {
         return [];
       }
-      const ipcClient = IpcClient.getInstance();
-      return ipcClient.listVersions({ appId });
+
+      try {
+        const commits = await gitApi.getCommitLog(appId);
+        // Map GitCommit[] to Version[]
+        return commits.map((commit) => ({
+          id: commit.hash,
+          message: commit.message,
+          author: commit.author,
+          date: commit.date,
+          hash: commit.hash,
+        }));
+      } catch (restError) {
+        // Fallback to IPC if REST API not implemented
+        console.warn(
+          "Git REST API not available, falling back to IPC:",
+          restError,
+        );
+        const ipcClient = IpcClient.getInstance();
+        if (!ipcClient) {
+          return [];
+        }
+        return (ipcClient as any).listVersions({ appId });
+      }
     },
     enabled: appId !== null,
-    placeholderData: [],
-    meta: { showErrorToast: true },
+    initialData: [],
+    meta: { showErrorToast: false }, // Don't show error toast, we have fallback
   });
 
   useEffect(() => {
@@ -42,27 +65,20 @@ export function useVersions(appId: number | null) {
   const revertVersionMutation = useMutation<
     RevertVersionResponse,
     Error,
-    {
-      versionId: string;
-      currentChatMessageId?: { chatId: number; messageId: number };
-    }
+    { versionId: string }
   >({
-    mutationFn: async ({
-      versionId,
-      currentChatMessageId,
-    }: {
-      versionId: string;
-      currentChatMessageId?: { chatId: number; messageId: number };
-    }) => {
+    mutationFn: async ({ versionId }: { versionId: string }) => {
       const currentAppId = appId;
       if (currentAppId === null) {
         throw new Error("App ID is null");
       }
       const ipcClient = IpcClient.getInstance();
-      return ipcClient.revertVersion({
+      if (!ipcClient) {
+        throw new Error("Version control not available in web mode");
+      }
+      return (ipcClient as any).revertVersion({
         appId: currentAppId,
         previousVersionId: versionId,
-        currentChatMessageId,
       });
     },
     onSuccess: async (result) => {
@@ -75,14 +91,18 @@ export function useVersions(appId: number | null) {
       await queryClient.invalidateQueries({
         queryKey: ["currentBranch", appId],
       });
-      if (selectedChatId) {
-        const chat = await IpcClient.getInstance().getChat(selectedChatId);
-        setMessagesById((prev) => {
-          const next = new Map(prev);
-          next.set(selectedChatId, chat.messages);
-          return next;
-        });
-      }
+      // NOTE: Refresh chat messages for the selected chat to reflect any changes
+      // if (selectedChatId) {
+      //   const ipcClient = IpcClient.getInstance();
+      //   if (ipcClient) {
+      //     const chat = await (ipcClient as any).getChat(selectedChatId);
+      //     setMessagesById((prev) => {
+      //       const next = new Map(prev);
+      //       next.set(selectedChatId, chat.messages);
+      //       return next;
+      //     });
+      //   }
+      // }
       await queryClient.invalidateQueries({
         queryKey: ["problems", appId],
       });

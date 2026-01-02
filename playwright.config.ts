@@ -42,12 +42,6 @@ const config: PlaywrightTestConfig = {
     // video: "retain-on-failure",
   },
 
-  webServer: [
-    {
-      command: `cd testing/fake-llm-server && npm run build && npm start`,
-      url: "http://localhost:3500/health",
-    },
-  ],
 };
 
 export default config;

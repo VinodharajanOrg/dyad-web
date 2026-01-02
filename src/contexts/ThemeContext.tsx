@@ -1,3 +1,4 @@
+"use client";
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "system" | "light" | "dark";
@@ -12,13 +13,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     // Try to get the saved theme from localStorage
-    const savedTheme = localStorage.getItem("theme") as Theme;
-    return savedTheme || "system";
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme") as Theme;
+      return savedTheme || "system";
+    }
+    return "system";
   });
 
   useEffect(() => {
     // Save theme preference to localStorage
-    localStorage.setItem("theme", theme);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("theme", theme);
+    }
 
     // Handle system theme changes
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");

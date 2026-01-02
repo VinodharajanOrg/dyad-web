@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { atom } from "jotai";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import {
-  appConsoleEntriesAtom,
+  appOutputAtom,
   appUrlAtom,
   currentAppAtom,
   previewPanelKeyAtom,
@@ -10,42 +10,48 @@ import {
   selectedAppIdAtom,
 } from "@/atoms/appAtoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { AppOutput } from "@/ipc/ipc_types";
+import { AppOutput } from "@/types/ipc_types";
 import { showInputRequest } from "@/lib/toast";
+import { useRestartDockerApp, useRunDockerApp } from "./useDockerLifecycle";
 
 const useRunAppLoadingAtom = atom(false);
 
 export function useRunApp() {
   const [loading, setLoading] = useAtom(useRunAppLoadingAtom);
   const [app, setApp] = useAtom(currentAppAtom);
-  const setConsoleEntries = useSetAtom(appConsoleEntriesAtom);
+  const setAppOutput = useSetAtom(appOutputAtom);
   const [, setAppUrlObj] = useAtom(appUrlAtom);
   const setPreviewPanelKey = useSetAtom(previewPanelKeyAtom);
   const appId = useAtomValue(selectedAppIdAtom);
   const setPreviewErrorMessage = useSetAtom(previewErrorMessageAtom);
+  const runDockerApp = useRunDockerApp();
+  const restartDockerApp = useRestartDockerApp();
 
-  const processProxyServerOutput = (output: AppOutput) => {
-    const matchesProxyServerStart = output.message.includes(
-      "[dyad-proxy-server]started=[",
-    );
-    if (matchesProxyServerStart) {
-      // Extract both proxy URL and original URL using regex
-      const proxyUrlMatch = output.message.match(
-        /\[dyad-proxy-server\]started=\[(.*?)\]/,
+  const processProxyServerOutput = useCallback(
+    (output: AppOutput) => {
+      const matchesProxyServerStart = output.message.includes(
+        "[dyad-proxy-server]started=[",
       );
-      const originalUrlMatch = output.message.match(/original=\[(.*?)\]/);
+      if (matchesProxyServerStart) {
+        // Extract both proxy URL and original URL using regex
+        const proxyUrlMatch = output.message.match(
+          /\[dyad-proxy-server\]started=\[(.*?)\]/,
+        );
+        const originalUrlMatch = output.message.match(/original=\[(.*?)\]/);
 
-      if (proxyUrlMatch && proxyUrlMatch[1]) {
-        const proxyUrl = proxyUrlMatch[1];
-        const originalUrl = originalUrlMatch && originalUrlMatch[1];
-        setAppUrlObj({
-          appUrl: proxyUrl,
-          appId: output.appId,
-          originalUrl: originalUrl!,
-        });
+        if (proxyUrlMatch && proxyUrlMatch[1]) {
+          const proxyUrl = proxyUrlMatch[1];
+          const originalUrl = originalUrlMatch && originalUrlMatch[1];
+          setAppUrlObj({
+            appUrl: proxyUrl,
+            appId: output.appId,
+            originalUrl: originalUrl!,
+          });
+        }
       }
-    }
-  };
+    },
+    [setAppUrlObj],
+  );
 
   const processAppOutput = useCallback(
     (output: AppOutput) => {
@@ -54,7 +60,11 @@ export function useRunApp() {
         showInputRequest(output.message, async (response) => {
           try {
             const ipcClient = IpcClient.getInstance();
-            await ipcClient.respondToAppInput({
+            if (!ipcClient) {
+              console.error("Input response not available in web mode");
+              return;
+            }
+            await (ipcClient as any).respondToAppInput({
               appId: output.appId,
               response,
             });
@@ -65,55 +75,34 @@ export function useRunApp() {
         return; // Don't add to regular output
       }
 
-      // Add to console entries
-      const level =
-        output.type === "stderr" || output.type === "client-error"
-          ? "error"
-          : "info";
-      setConsoleEntries((prev) => [
-        ...prev,
-        {
-          level,
-          type: "build-time",
-          message: output.message,
-          timestamp: output.timestamp,
-          appId: output.appId,
-        },
-      ]);
+      // Add to regular app output
+      setAppOutput((prev) => [...prev, output]);
 
       // Process proxy server output
       processProxyServerOutput(output);
     },
-    [setConsoleEntries],
+    [setAppOutput, processProxyServerOutput],
   );
+
   const runApp = useCallback(
     async (appId: number) => {
       setLoading(true);
       try {
-        const ipcClient = IpcClient.getInstance();
-        console.debug("Running app", appId);
-
         // Clear the URL and add restart message
-        setAppUrlObj((prevAppUrlObj) => {
-          if (prevAppUrlObj?.appId !== appId) {
-            return { appUrl: null, appId: null, originalUrl: null };
-          }
-          return prevAppUrlObj; // No change needed
-        });
+        setAppUrlObj({ appUrl: null, appId: null, originalUrl: null });
 
-        setConsoleEntries((prev) => [
+        setAppOutput((prev) => [
           ...prev,
           {
-            level: "info",
-            type: "build-time",
-            message: "Trying to restart app...",
-            timestamp: Date.now(),
+            message: "Trying to start app...",
+            type: "stdout",
             appId,
+            timestamp: Date.now(),
           },
         ]);
-        const app = await ipcClient.getApp(appId);
-        setApp(app);
-        await ipcClient.runApp(appId, processAppOutput);
+
+        // useRunDockerApp handles setting app URL and logging success message
+        await runDockerApp(appId);
         setPreviewErrorMessage(undefined);
       } catch (error) {
         console.error(`Error running app ${appId}:`, error);
@@ -129,7 +118,13 @@ export function useRunApp() {
         setLoading(false);
       }
     },
-    [processAppOutput],
+    [
+      processAppOutput,
+      setAppOutput,
+      setAppUrlObj,
+      setPreviewErrorMessage,
+      runDockerApp,
+    ],
   );
 
   const stopApp = useCallback(async (appId: number) => {
@@ -137,11 +132,16 @@ export function useRunApp() {
       return;
     }
 
+    // Check if IPC client is available (null in web mode)
+    const ipcClient = IpcClient.getInstance();
+    if (!ipcClient) {
+      console.warn("App stopping not available in web mode");
+      return; // Silently skip in web mode
+    }
+
     setLoading(true);
     try {
-      const ipcClient = IpcClient.getInstance();
-      await ipcClient.stopApp(appId);
-
+      await (ipcClient as any).stopApp(appId);
       setPreviewErrorMessage(undefined);
     } catch (error) {
       console.error(`Error stopping app ${appId}:`, error);
@@ -159,7 +159,7 @@ export function useRunApp() {
   }, []);
 
   const onHotModuleReload = useCallback(() => {
-    setPreviewPanelKey((prevKey) => prevKey + 1);
+    setPreviewPanelKey((prev) => prev + 1);
   }, [setPreviewPanelKey]);
 
   const restartApp = useCallback(
@@ -169,9 +169,16 @@ export function useRunApp() {
       if (appId === null) {
         return;
       }
+
       setLoading(true);
       try {
+        // Check if IPC client is available (null in web mode)
         const ipcClient = IpcClient.getInstance();
+
+        if (!ipcClient) {
+          // Web mode: restart Docker container for this appId
+          await restartDockerApp(appId);
+        }
         console.debug(
           "Restarting app",
           appId,
@@ -180,34 +187,33 @@ export function useRunApp() {
 
         // Clear the URL and add restart message
         setAppUrlObj({ appUrl: null, appId: null, originalUrl: null });
-        setConsoleEntries((prev) => [
+        setAppOutput((prev) => [
           ...prev,
           {
-            level: "info",
-            type: "build-time",
             message: "Restarting app...",
-            timestamp: Date.now(),
+            type: "stdout",
             appId,
+            timestamp: Date.now(),
           },
         ]);
 
-        const app = await ipcClient.getApp(appId);
-        setApp(app);
-        await ipcClient.restartApp(
-          appId,
-          (output) => {
-            // Handle HMR updates before processing
-            if (
-              output.message.includes("hmr update") &&
-              output.message.includes("[vite]")
-            ) {
-              onHotModuleReload();
-            }
-            // Process normally (including input requests)
-            processAppOutput(output);
-          },
-          removeNodeModules,
-        );
+        // const app = await (ipcClient as any).getApp(appId);
+        // setApp(app);
+        // await (ipcClient as any).restartApp(
+        //   appId,
+        //   (output: any) => {
+        //     // Handle HMR updates before processing
+        //     if (
+        //       output.message.includes("hmr update") &&
+        //       output.message.includes("[vite]")
+        //     ) {
+        //       onHotModuleReload();
+        //     }
+        //     // Process normally (including input requests)
+        //     processAppOutput(output);
+        //   },
+        //   removeNodeModules,
+        // );
       } catch (error) {
         console.error(`Error restarting app ${appId}:`, error);
         setPreviewErrorMessage(
@@ -219,23 +225,24 @@ export function useRunApp() {
               },
         );
       } finally {
-        setPreviewPanelKey((prevKey) => prevKey + 1);
+        setPreviewPanelKey((prev) => prev + 1);
         setLoading(false);
       }
     },
     [
       appId,
       setApp,
-      setConsoleEntries,
+      setAppOutput,
       setAppUrlObj,
       setPreviewPanelKey,
       processAppOutput,
       onHotModuleReload,
+      restartDockerApp,
     ],
   );
 
   const refreshAppIframe = useCallback(async () => {
-    setPreviewPanelKey((prevKey) => prevKey + 1);
+    setPreviewPanelKey((prev) => prev + 1);
   }, [setPreviewPanelKey]);
 
   return {

@@ -1,3 +1,4 @@
+"use client";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";

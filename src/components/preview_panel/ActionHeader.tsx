@@ -1,6 +1,12 @@
-import { useAtom, useAtomValue } from "jotai";
-import { previewModeAtom, selectedAppIdAtom } from "../../atoms/appAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
+"use client";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import {
+  previewModeAtom,
+  selectedAppIdAtom,
+  appUrlAtom,
+} from "../../atoms/appAtoms";
+import { IpcClient } from "@/api/ipc_client";
+import { setupDockerUrlFromStatus, extractValidPort } from "@/lib/docker-utils";
 
 import {
   Eye,
@@ -15,9 +21,12 @@ import {
 } from "lucide-react";
 import { ChatActivityButton } from "@/components/chat/ChatActivity";
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { usePathname } from "next/navigation";
+import { SHORT_ANIMATION_DELAY } from "@/lib/constants";
 
 import { useRunApp } from "@/hooks/useRunApp";
+import { useDockerStatus } from "@/hooks/useDockerStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +54,13 @@ export type PreviewMode =
 
 // Preview Header component with preview mode toggle
 export const ActionHeader = () => {
+  const pathname = usePathname();
+
+  // Call all hooks unconditionally (React Rules of Hooks)
   const [previewMode, setPreviewMode] = useAtom(previewModeAtom);
   const [isPreviewOpen, setIsPreviewOpen] = useAtom(isPreviewOpenAtom);
   const selectedAppId = useAtomValue(selectedAppIdAtom);
+  const setAppUrlObj = useSetAtom(appUrlAtom);
   const previewRef = useRef<HTMLButtonElement>(null);
   const codeRef = useRef<HTMLButtonElement>(null);
   const problemsRef = useRef<HTMLButtonElement>(null);
@@ -55,14 +68,53 @@ export const ActionHeader = () => {
   const publishRef = useRef<HTMLButtonElement>(null);
   const securityRef = useRef<HTMLButtonElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024,
+  );
   const { problemReport } = useCheckProblems(selectedAppId);
   const { restartApp, refreshAppIframe } = useRunApp();
+  const { dockerStatus, isPublishEnabled } = useDockerStatus(selectedAppId);
+
+  // Only render ActionHeader on chat routes - prevent API calls on other routes
+  const isOnChatRoute = useMemo(() => {
+    return pathname.includes("/chat");
+  }, [pathname]);
+
+  if (!isOnChatRoute) {
+    return null;
+  }
 
   const isCompact = windowWidth < 888;
+  // Set app URL when Docker status polling detects container is ready
+  // This ensures preview iframe gets the URL even if initial setup missed it
+  useEffect(() => {
+    if (dockerStatus && selectedAppId) {
+      const port = extractValidPort(dockerStatus.port);
+      if (port > 0) {
+        setupDockerUrlFromStatus(
+          port,
+          selectedAppId,
+          dockerStatus,
+          setAppUrlObj,
+        );
+      }
+    }
+  }, [dockerStatus, selectedAppId, setAppUrlObj]);
+
+  // NOTE: Use dynamic url for publish based on environment
+  const handlePublishClick = () => {
+    if (isPublishEnabled && dockerStatus?.port) {
+      const port = Number(String(dockerStatus.port).replace(/[^0-9]/g, ""));
+      const url = `http://localhost:${port}`;
+      window.open(url, "_blank");
+    }
+  };
 
   // Track window width
   useEffect(() => {
+    // Set initial width on client
+    setWindowWidth(window.innerWidth);
+
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
     };
@@ -88,7 +140,7 @@ export const ActionHeader = () => {
     return useMutation({
       mutationFn: () => {
         const ipcClient = IpcClient.getInstance();
-        return ipcClient.clearSessionData();
+        return (ipcClient as any).clearSessionData();
       },
       onSuccess: async () => {
         await refreshAppIframe();
@@ -164,7 +216,7 @@ export const ActionHeader = () => {
     };
 
     // Small delay to ensure DOM is updated
-    const timeoutId = setTimeout(updateIndicator, 10);
+    const timeoutId = setTimeout(updateIndicator, SHORT_ANIMATION_DELAY);
     return () => clearTimeout(timeoutId);
   }, [previewMode, displayCount, isPreviewOpen, isCompact]);
 
@@ -175,13 +227,25 @@ export const ActionHeader = () => {
     text: string,
     testId: string,
     badge?: React.ReactNode,
+    isDisabled?: boolean,
+    onClickOverride?: () => void,
   ) => {
     const buttonContent = (
       <button
         data-testid={testId}
         ref={ref}
-        className="no-app-region-drag cursor-pointer relative flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-medium z-10 hover:bg-[var(--background)] flex-col"
-        onClick={() => selectPanel(mode)}
+        className={`no-app-region-drag cursor-pointer relative flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-medium z-10 hover:bg-[var(--background)] flex-col ${
+          isDisabled ? "opacity-50 cursor-not-allowed" : ""
+        }`}
+        onClick={() => {
+          if (onClickOverride) {
+            onClickOverride();
+          } else {
+            selectPanel(mode);
+          }
+        }}
+        disabled={isDisabled}
+        title={isDisabled ? "App must be running and ready to publish" : ""}
       >
         {icon}
         <span>
@@ -230,6 +294,7 @@ export const ActionHeader = () => {
             "Preview",
             "preview-mode-button",
           )}
+          {/* Problems button disabled - As of now this feature is disabled */}
           {renderButton(
             "problems",
             problemsRef,
@@ -241,6 +306,7 @@ export const ActionHeader = () => {
                 {displayCount}
               </span>
             ),
+            true, // Disabled
           )}
           {renderButton(
             "code",
@@ -249,19 +315,25 @@ export const ActionHeader = () => {
             "Code",
             "code-mode-button",
           )}
+          {/* Configure button disabled - As of now this feature is disabled */}
           {renderButton(
             "configure",
             configureRef,
             <Wrench size={iconSize} />,
             "Configure",
             "configure-mode-button",
+            undefined,
+            true, // Disabled
           )}
+          {/* Security button disabled - As of now this feature is disabled */}
           {renderButton(
             "security",
             securityRef,
             <Shield size={iconSize} />,
             "Security",
             "security-mode-button",
+            undefined,
+            true, // Disabled
           )}
           {renderButton(
             "publish",
@@ -269,10 +341,13 @@ export const ActionHeader = () => {
             <Globe size={iconSize} />,
             "Publish",
             "publish-mode-button",
+            undefined,
+            !isPublishEnabled,
+            isPublishEnabled ? handlePublishClick : undefined,
           )}
         </div>
-        {/* Chat activity bell */}
-        <div className="flex items-center gap-1">
+        {/* Chat activity bell and more options disabled - As of now these features are disabled */}
+        <div className="flex items-center gap-1 opacity-50 pointer-events-none">
           <ChatActivityButton />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -280,12 +355,16 @@ export const ActionHeader = () => {
                 data-testid="preview-more-options-button"
                 className="no-app-region-drag flex items-center justify-center p-1.5 rounded-md text-sm hover:bg-[var(--background-darkest)] transition-colors"
                 title="More options"
+                disabled
               >
                 <MoreVertical size={16} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuItem onClick={onCleanRestart}>
+              <DropdownMenuItem
+                onClick={isPublishEnabled ? onCleanRestart : undefined}
+                disabled={!isPublishEnabled}
+              >
                 <Cog size={16} />
                 <div className="flex flex-col">
                   <span>Rebuild</span>

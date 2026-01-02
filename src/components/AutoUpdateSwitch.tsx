@@ -1,8 +1,9 @@
+"use client";
 import { useSettings } from "@/hooks/useSettings";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 
 export function AutoUpdateSwitch() {
   const { settings, updateSettings } = useSettings();
@@ -24,7 +25,10 @@ export function AutoUpdateSwitch() {
             action: {
               label: "Restart Dyad",
               onClick: () => {
-                IpcClient.getInstance().restartDyad();
+                const client = IpcClient.getInstance();
+                if (client) {
+                  (client as any).restartDyad();
+                }
               },
             },
           });

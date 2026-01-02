@@ -1,13 +1,23 @@
+"use client";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppUpgrade } from "@/ipc/ipc_types";
+import { AppUpgrade } from "@/types/ipc_types";
 
 export function AppUpgrades({ appId }: { appId: number | null }) {
   const queryClient = useQueryClient();
+
+  const ipcClient = IpcClient.getInstance();
+
+  // NOTE: Web mode - AppUpgrades not available in web version (Electron-only)
+  // Return null to hide the component in web mode
+  if (!ipcClient) {
+    return null;
+  }
 
   const {
     data: upgrades,
@@ -16,12 +26,12 @@ export function AppUpgrades({ appId }: { appId: number | null }) {
   } = useQuery({
     queryKey: ["app-upgrades", appId],
     queryFn: () => {
-      if (!appId) {
+      if (!appId || !ipcClient) {
         return Promise.resolve([]);
       }
-      return IpcClient.getInstance().getAppUpgrades({ appId });
+      return (ipcClient as any).getAppUpgrades({ appId });
     },
-    enabled: !!appId,
+    enabled: !!appId && !!ipcClient,
   });
 
   const {
@@ -34,7 +44,11 @@ export function AppUpgrades({ appId }: { appId: number | null }) {
       if (!appId) {
         throw new Error("appId is not set");
       }
-      return IpcClient.getInstance().executeAppUpgrade({
+      // Check if IPC client is available
+      if (!ipcClient) {
+        throw new Error("App upgrades not available in web mode");
+      }
+      return (ipcClient as any).executeAppUpgrade({
         appId,
         upgradeId,
       });
@@ -46,7 +60,6 @@ export function AppUpgrades({ appId }: { appId: number | null }) {
         // query to show the new status.
         queryClient.invalidateQueries({ queryKey: ["is-capacitor", appId] });
       }
-      queryClient.invalidateQueries({ queryKey: ["versions", appId] });
     },
   });
 
@@ -83,7 +96,7 @@ export function AppUpgrades({ appId }: { appId: number | null }) {
     );
   }
 
-  const currentUpgrades = upgrades?.filter((u) => u.isNeeded) ?? [];
+  const currentUpgrades = upgrades?.filter((u: AppUpgrade) => u.isNeeded) ?? [];
 
   return (
     <div className="mt-6">
@@ -125,9 +138,19 @@ export function AppUpgrades({ appId }: { appId: number | null }) {
                       <a
                         onClick={(e) => {
                           e.stopPropagation();
-                          IpcClient.getInstance().openExternalUrl(
-                            upgrade.manualUpgradeUrl ?? "https://dyad.sh/docs",
-                          );
+                          // Check if IPC client is available
+                          const client = IpcClient.getInstance();
+                          if (client) {
+                            (client as any).openExternalUrl(
+                              upgrade.manualUpgradeUrl ??
+                                "https://dyad.sh/docs",
+                            );
+                          } else {
+                            openExternalUrl(
+                              upgrade.manualUpgradeUrl ??
+                                "https://dyad.sh/docs",
+                            );
+                          }
                         }}
                         className="underline font-medium hover:dark:text-red-200"
                       >

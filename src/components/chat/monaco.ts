@@ -1,7 +1,6 @@
-import type { editor } from "monaco-editor";
-import { loader } from "@monaco-editor/react";
+import type * as monacoType from "monaco-editor";
 
-export const customLight: editor.IStandaloneThemeData = {
+export const customLight: monacoType.editor.IStandaloneThemeData = {
   base: "vs",
   inherit: false,
   rules: [
@@ -69,10 +68,12 @@ export const customLight: editor.IStandaloneThemeData = {
     "editorIndentGuide.background1": "#D3D3D3",
     "editorIndentGuide.activeBackground1": "#939393",
     "editor.selectionHighlightBackground": "#ADD6FF4D",
+    "editorLineNumber.foreground": "#858585",
+    "editorLineNumber.activeForeground": "#000000",
   },
 };
 
-export const customDark: editor.IStandaloneThemeData = {
+export const customDark: monacoType.editor.IStandaloneThemeData = {
   base: "vs-dark",
   inherit: false,
   rules: [
@@ -139,18 +140,26 @@ export const customDark: editor.IStandaloneThemeData = {
     "editorIndentGuide.background1": "#404040",
     "editorIndentGuide.activeBackground1": "#707070",
     "editor.selectionHighlightBackground": "#ADD6FF26",
+    "editorLineNumber.foreground": "#858585",
+    "editorLineNumber.activeForeground": "#D4D4D4",
   },
 };
 
-loader.init().then((monaco) => {
+// Initialize Monaco when it's loaded by the editor component
+export function initializeMonaco(monaco: typeof monacoType) {
+  // Define custom themes
   monaco.editor.defineTheme("dyad-light", customLight);
   monaco.editor.defineTheme("dyad-dark", customDark);
 
+  // Configure TypeScript/JavaScript
+  // @ts-ignore - typescriptDefaults is deprecated but still functional
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+    // @ts-ignore - JsxEmit is deprecated but still available
     jsx: monaco.languages.typescript.JsxEmit.React, // Enable JSX
   });
+  // @ts-ignore - typescriptDefaults is deprecated but still functional
   monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
     // Too noisy because we don't have the full TS environment.
     noSemanticValidation: true,
   });
-});
+}

@@ -4,8 +4,7 @@ Dyad is still a very early-stage project, thus the codebase is rapidly changing.
 
 Before opening a pull request, please open an issue and discuss whether the change makes sense in Dyad. Ensuring a cohesive user experience sometimes means we can't include every possible feature or we need to consider the long-term design of how we want to support a feature area.
 
-- For a high-level overview of how Dyad works, please see the [Architecture Guide](./docs/architecture.md). Understanding the architecture will help ensure your contributions align with the overall design of the project.
-- For a detailed architecture on how the new local agent mode (aka Agent v2) works, please read the [Agent Architecture Guide](./docs/agent_architecture.md)
+For a high-level overview of how Dyad works, please see the [Architecture Guide](./docs/architecture.md). Understanding the architecture will help ensure your contributions align with the overall design of the project.
 
 ## More than code contributions
 

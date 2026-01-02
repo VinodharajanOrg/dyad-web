@@ -1,12 +1,13 @@
+"use client";
+
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { useNavigate } from "@tanstack/react-router";
-import { providerSettingsRoute } from "@/routes/settings/providers/$provider";
-import type { LanguageModelProvider } from "@/ipc/ipc_types";
+import { useRouter } from "next/navigation";
+import type { LanguageModelProvider } from "@/types/ipc_types";
 
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useCustomLanguageModelProvider } from "@/hooks/useCustomLanguageModelProvider";
@@ -36,7 +37,7 @@ import {
 import { CreateCustomProviderDialog } from "./CreateCustomProviderDialog";
 
 export function ProviderSettingsGrid() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] =
     useState<LanguageModelProvider | null>(null);
@@ -47,23 +48,19 @@ export function ProviderSettingsGrid() {
     isLoading,
     error,
     isProviderSetup,
-    refetch,
   } = useLanguageModelProviders();
 
   const { deleteProvider, isDeleting } = useCustomLanguageModelProvider();
 
   const handleProviderClick = (providerId: string) => {
-    navigate({
-      to: providerSettingsRoute.id,
-      params: { provider: providerId },
-    });
+    router.push(`/settings/providers/${providerId}`);
   };
 
   const handleDeleteProvider = async () => {
     if (providerToDelete) {
       await deleteProvider(providerToDelete);
       setProviderToDelete(null);
-      refetch();
+      // Note: Do NOT call refetch() here - the mutation already invalidates the query cache
     }
   };
 
@@ -112,8 +109,7 @@ export function ProviderSettingsGrid() {
         {providers
           ?.filter((p) => p.type !== "local")
           .map((provider: LanguageModelProvider) => {
-            const isCustom = provider.type === "custom";
-
+            const isCustom = true;
             return (
               <Card
                 key={provider.id}
@@ -121,63 +117,67 @@ export function ProviderSettingsGrid() {
               >
                 <CardHeader
                   className="p-4 cursor-pointer"
-                  onClick={() => handleProviderClick(provider.id)}
+                  onClick={() => handleProviderClick(provider.name)}
                 >
-                  {isCustom && (
-                    <div
-                      className="flex items-center justify-end"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="edit-custom-provider"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-muted rounded-md"
-                            onClick={() => handleEditProvider(provider)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit Provider</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="delete-custom-provider"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-md"
-                            onClick={() => setProviderToDelete(provider.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete Provider</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  )}
-                  <CardTitle className="text-lg font-medium mb-2">
-                    {provider.name}
-                    {isProviderSetup(provider.id) ? (
-                      <span className="ml-3 text-sm font-medium text-green-500 bg-green-50 dark:bg-green-900/30 border border-green-500/50 dark:border-green-500/50 px-2 py-1 rounded-full">
-                        Ready
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-500 bg-gray-50 dark:bg-gray-900 dark:text-gray-300 px-2 py-1 rounded-full">
-                        Needs Setup
-                      </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg font-medium flex-1">
+                      {provider.name}
+                      {isProviderSetup(provider.name) ? (
+                        <span className="ml-3 text-sm font-medium text-green-500 bg-green-50 dark:bg-green-900/30 border border-green-500/50 dark:border-green-500/50 px-2 py-1 rounded-full">
+                          Ready
+                        </span>
+                      ) : (
+                        <span className="ml-3 text-sm text-gray-500 bg-gray-50 dark:bg-gray-900 dark:text-gray-300 px-2 py-1 rounded-full">
+                          Needs Setup
+                        </span>
+                      )}
+                    </CardTitle>
+                    {isCustom && (
+                      <div
+                        className="flex items-center gap-1 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              data-testid="edit-provider"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-muted rounded-md"
+                              onClick={() => handleEditProvider(provider)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit Provider</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              data-testid="delete-provider"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-md"
+                              onClick={() =>
+                                setProviderToDelete(String(provider.id))
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete Provider</TooltipContent>
+                        </Tooltip>
+                      </div>
                     )}
-                  </CardTitle>
-                  <CardDescription>
-                    {provider.hasFreeTier && (
-                      <span className="text-blue-600 mt-2 dark:text-blue-400 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full inline-flex items-center">
+                  </div>
+                  {provider.hasFreeTier && (
+                    <CardDescription className="mt-2">
+                      <span className="text-blue-600 dark:text-blue-400 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full inline-flex items-center">
                         <GiftIcon className="w-4 h-4 mr-1" />
                         Free tier available
                       </span>
-                    )}
-                  </CardDescription>
+                    </CardDescription>
+                  )}
                 </CardHeader>
               </Card>
             );
@@ -208,7 +208,7 @@ export function ProviderSettingsGrid() {
         }}
         onSuccess={() => {
           setIsDialogOpen(false);
-          refetch();
+          // Note: Do NOT call refetch() here - the mutation already invalidates the query cache
           setEditingProvider(null);
         }}
         editingProvider={editingProvider}

@@ -1,10 +1,15 @@
-import { atom } from "jotai";
-import { type LocalModel } from "@/ipc/ipc_types";
+import { atom, WritableAtom } from "jotai";
+import { type LocalModel } from "@/types/ipc_types";
 
-export const localModelsAtom = atom<LocalModel[]>([]);
-export const localModelsLoadingAtom = atom<boolean>(false);
-export const localModelsErrorAtom = atom<Error | null>(null);
+// Helper to create properly typed writable atoms
+function writableAtom<T>(initialValue: T): WritableAtom<T, [T], void> {
+  return atom(initialValue) as any;
+}
 
-export const lmStudioModelsAtom = atom<LocalModel[]>([]);
-export const lmStudioModelsLoadingAtom = atom<boolean>(false);
-export const lmStudioModelsErrorAtom = atom<Error | null>(null);
+export const localModelsAtom = writableAtom<LocalModel[]>([]);
+export const localModelsLoadingAtom = writableAtom<boolean>(false);
+export const localModelsErrorAtom = writableAtom<Error | null>(null);
+
+export const lmStudioModelsAtom = writableAtom<LocalModel[]>([]);
+export const lmStudioModelsLoadingAtom = writableAtom<boolean>(false);
+export const lmStudioModelsErrorAtom = writableAtom<Error | null>(null);

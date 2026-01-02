@@ -45,6 +45,8 @@ export function useShortcut(
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.key) return;
+
       if (
         validateShortcut(event.key.toLowerCase(), {
           ctrl: event.ctrlKey,

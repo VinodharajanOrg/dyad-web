@@ -1,3 +1,4 @@
+"use client";
 import {
   CommandDialog,
   CommandInput,
@@ -8,20 +9,19 @@ import {
 } from "./ui/command";
 import { useState, useEffect } from "react";
 import { useSearchChats } from "@/hooks/useSearchChats";
-import type { ChatSummary, ChatSearchResult } from "@/lib/schemas";
+import type { ChatSummary } from "@/api/endpoints/chats";
+import { SEARCH_DEBOUNCE_DELAY } from "@/lib/constants";
 
 type ChatSearchDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectChat: ({ chatId, appId }: { chatId: number; appId: number }) => void;
-  appId: number | null;
   allChats: ChatSummary[];
 };
 
 export function ChatSearchDialog({
   open,
   onOpenChange,
-  appId,
   onSelectChat,
   allChats,
 }: ChatSearchDialogProps) {
@@ -35,57 +35,11 @@ export function ChatSearchDialog({
     return debounced;
   }
 
-  const debouncedQuery = useDebouncedValue(searchQuery, 150);
-  const { chats: searchResults } = useSearchChats(appId, debouncedQuery);
+  const debouncedQuery = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_DELAY);
+  const { chats: searchResults } = useSearchChats(debouncedQuery);
 
   // Show all chats if search is empty, otherwise show search results
   const chatsToShow = debouncedQuery.trim() === "" ? allChats : searchResults;
-
-  const commandFilter = (
-    value: string,
-    search: string,
-    keywords?: string[],
-  ): number => {
-    const q = search.trim().toLowerCase();
-    if (!q) return 1;
-    const v = (value || "").toLowerCase();
-    if (v.includes(q)) {
-      // Higher score for earlier match in title/value
-      return 100 - Math.max(0, v.indexOf(q));
-    }
-    const foundInKeywords = (keywords || []).some((k) =>
-      (k || "").toLowerCase().includes(q),
-    );
-    return foundInKeywords ? 50 : 0;
-  };
-
-  function getSnippet(
-    text: string,
-    query: string,
-    radius = 50,
-  ): {
-    before: string;
-    match: string;
-    after: string;
-    raw: string;
-  } {
-    const q = query.trim();
-    const lowerText = text;
-    const lowerQuery = q.toLowerCase();
-    const idx = lowerText.toLowerCase().indexOf(lowerQuery);
-    if (idx === -1) {
-      const raw =
-        text.length > radius * 2 ? text.slice(0, radius * 2) + "…" : text;
-      return { before: "", match: "", after: "", raw };
-    }
-    const start = Math.max(0, idx - radius);
-    const end = Math.min(text.length, idx + q.length + radius);
-    const before = (start > 0 ? "…" : "") + text.slice(start, idx);
-    const match = text.slice(idx, idx + q.length);
-    const after =
-      text.slice(idx + q.length, end) + (end < text.length ? "…" : "");
-    return { before, match, after, raw: before + match + after };
-  }
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -103,7 +57,6 @@ export function ChatSearchDialog({
       open={open}
       onOpenChange={onOpenChange}
       data-testid="chat-search-dialog"
-      filter={commandFilter}
     >
       <CommandInput
         placeholder="Search chats"
@@ -115,15 +68,19 @@ export function ChatSearchDialog({
         <CommandGroup heading="Chats">
           {chatsToShow.map((chat) => {
             const isSearch = searchQuery.trim() !== "";
+            // For search results (ChatWithMessages), show message snippets
             const hasSnippet =
               isSearch &&
-              "matchedMessageContent" in chat &&
-              (chat as ChatSearchResult).matchedMessageContent;
+              "messages" in chat &&
+              Array.isArray(chat.messages) &&
+              chat.messages.length > 0;
             const snippet = hasSnippet
-              ? getSnippet(
-                  (chat as ChatSearchResult).matchedMessageContent as string,
-                  searchQuery,
-                )
+              ? {
+                  raw: (chat as any).messages[0]?.content.slice(0, 100) || "",
+                  before: "",
+                  match: "",
+                  after: "",
+                }
               : null;
             return (
               <CommandItem
@@ -141,11 +98,7 @@ export function ChatSearchDialog({
                   <span>{chat.title || "Untitled Chat"}</span>
                   {snippet && (
                     <span className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {snippet.before}
-                      <mark className="bg-transparent underline decoration-2 decoration-primary">
-                        {snippet.match}
-                      </mark>
-                      {snippet.after}
+                      {snippet.raw}
                     </span>
                   )}
                 </div>

@@ -1,10 +1,8 @@
-import React, { useRef, useState } from "react";
-import type { FileAttachment } from "@/ipc/ipc_types";
-import { useAtom } from "jotai";
-import { attachmentsAtom } from "@/atoms/chatAtoms";
+import React, { useState, useRef } from "react";
+import type { FileAttachment } from "@/types/ipc_types";
 
 export function useAttachments() {
-  const [attachments, setAttachments] = useAtom(attachmentsAtom);
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -117,7 +115,6 @@ export function useAttachments() {
       if (imageFiles.length > 0) {
         addAttachments(imageFiles, "chat-context");
         // Show a brief toast or indication that image was pasted
-        console.log(`Pasted ${imageFiles.length} image(s) from clipboard`);
       }
     }
   };
@@ -135,6 +132,5 @@ export function useAttachments() {
     handleDrop,
     clearAttachments,
     handlePaste,
-    addAttachments,
   };
 }

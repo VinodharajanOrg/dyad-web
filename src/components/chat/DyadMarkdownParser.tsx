@@ -1,6 +1,6 @@
+"use client";
 import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
-
 import { DyadWrite } from "./DyadWrite";
 import { DyadRename } from "./DyadRename";
 import { DyadDelete } from "./DyadDelete";
@@ -13,11 +13,10 @@ import { DyadCodebaseContext } from "./DyadCodebaseContext";
 import { DyadThink } from "./DyadThink";
 import { CodeHighlight } from "./CodeHighlight";
 import { useAtomValue } from "jotai";
-import { isStreamingByIdAtom, selectedChatIdAtom } from "@/atoms/chatAtoms";
+import { isStreamingByIdAtom } from "@/atoms/chatAtoms";
 import { CustomTagState } from "./stateTypes";
 import { DyadOutput } from "./DyadOutput";
 import { DyadProblemSummary } from "./DyadProblemSummary";
-import { IpcClient } from "@/ipc/ipc_client";
 import { DyadMcpToolCall } from "./DyadMcpToolCall";
 import { DyadMcpToolResult } from "./DyadMcpToolResult";
 import { DyadWebSearchResult } from "./DyadWebSearchResult";
@@ -26,41 +25,13 @@ import { DyadWebCrawl } from "./DyadWebCrawl";
 import { DyadCodeSearchResult } from "./DyadCodeSearchResult";
 import { DyadCodeSearch } from "./DyadCodeSearch";
 import { DyadRead } from "./DyadRead";
-import { DyadListFiles } from "./DyadListFiles";
-import { DyadDatabaseSchema } from "./DyadDatabaseSchema";
 import { mapActionToButton } from "./ChatInput";
 import { SuggestedAction } from "@/lib/schemas";
-import { FixAllErrorsButton } from "./FixAllErrorsButton";
-
-const DYAD_CUSTOM_TAGS = [
-  "dyad-write",
-  "dyad-rename",
-  "dyad-delete",
-  "dyad-add-dependency",
-  "dyad-execute-sql",
-  "dyad-add-integration",
-  "dyad-output",
-  "dyad-problem-report",
-  "dyad-chat-summary",
-  "dyad-edit",
-  "dyad-search-replace",
-  "dyad-codebase-context",
-  "dyad-web-search-result",
-  "dyad-web-search",
-  "dyad-web-crawl",
-  "dyad-code-search-result",
-  "dyad-code-search",
-  "dyad-read",
-  "think",
-  "dyad-command",
-  "dyad-mcp-tool-call",
-  "dyad-mcp-tool-result",
-  "dyad-list-files",
-  "dyad-database-schema",
-];
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 interface DyadMarkdownParserProps {
   content: string;
+  chatId: number;
 }
 
 type CustomTagInfo = {
@@ -88,7 +59,7 @@ const customLink = ({
       const url = props.href;
       if (url) {
         e.preventDefault();
-        IpcClient.getInstance().openExternalUrl(url);
+        openExternalUrl(url);
       }
     }}
   />
@@ -112,41 +83,14 @@ export const VanillaMarkdownParser = ({ content }: { content: string }) => {
  */
 export const DyadMarkdownParser: React.FC<DyadMarkdownParserProps> = ({
   content,
+  chatId,
 }) => {
-  const chatId = useAtomValue(selectedChatIdAtom);
+  // const chatId = useAtomValue(selectedChatIdAtom);
   const isStreaming = useAtomValue(isStreamingByIdAtom).get(chatId!) ?? false;
   // Extract content pieces (markdown and custom tags)
   const contentPieces = useMemo(() => {
     return parseCustomTags(content);
   }, [content]);
-
-  // Extract error messages and track positions
-  const { errorMessages, lastErrorIndex, errorCount } = useMemo(() => {
-    const errors: string[] = [];
-    let lastIndex = -1;
-    let count = 0;
-
-    contentPieces.forEach((piece, index) => {
-      if (
-        piece.type === "custom-tag" &&
-        piece.tagInfo.tag === "dyad-output" &&
-        piece.tagInfo.attributes.type === "error"
-      ) {
-        const errorMessage = piece.tagInfo.attributes.message;
-        if (errorMessage?.trim()) {
-          errors.push(errorMessage.trim());
-          count++;
-          lastIndex = index;
-        }
-      }
-    });
-
-    return {
-      errorMessages: errors,
-      lastErrorIndex: lastIndex,
-      errorCount: count,
-    };
-  }, [contentPieces]);
 
   return (
     <>
@@ -164,17 +108,6 @@ export const DyadMarkdownParser: React.FC<DyadMarkdownParserProps> = ({
                 </ReactMarkdown>
               )
             : renderCustomTag(piece.tagInfo, { isStreaming })}
-          {index === lastErrorIndex &&
-            errorCount > 1 &&
-            !isStreaming &&
-            chatId && (
-              <div className="mt-3 w-full flex">
-                <FixAllErrorsButton
-                  errorMessages={errorMessages}
-                  chatId={chatId}
-                />
-              </div>
-            )}
         </React.Fragment>
       ))}
     </>
@@ -191,12 +124,35 @@ function preprocessUnclosedTags(content: string): {
   processedContent: string;
   inProgressTags: Map<string, Set<number>>;
 } {
+  const customTagNames = [
+    "dyad-write",
+    "dyad-rename",
+    "dyad-delete",
+    "dyad-add-dependency",
+    "dyad-execute-sql",
+    "dyad-add-integration",
+    "dyad-output",
+    "dyad-problem-report",
+    "dyad-chat-summary",
+    "dyad-edit",
+    "dyad-search-replace",
+    "dyad-codebase-context",
+    "dyad-web-search-result",
+    "dyad-web-search",
+    "dyad-web-crawl",
+    "dyad-read",
+    "think",
+    "dyad-command",
+    "dyad-mcp-tool-call",
+    "dyad-mcp-tool-result",
+  ];
+
   let processedContent = content;
   // Map to track which tags are in progress and their positions
   const inProgressTags = new Map<string, Set<number>>();
 
   // For each tag type, check if there are unclosed tags
-  for (const tagName of DYAD_CUSTOM_TAGS) {
+  for (const tagName of customTagNames) {
     // Count opening and closing tags
     const openTagPattern = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, "g");
     const closeTagPattern = new RegExp(`</${tagName}>`, "g");
@@ -242,8 +198,33 @@ function preprocessUnclosedTags(content: string): {
 function parseCustomTags(content: string): ContentPiece[] {
   const { processedContent, inProgressTags } = preprocessUnclosedTags(content);
 
+  const customTagNames = [
+    "dyad-write",
+    "dyad-rename",
+    "dyad-delete",
+    "dyad-add-dependency",
+    "dyad-execute-sql",
+    "dyad-add-integration",
+    "dyad-output",
+    "dyad-problem-report",
+    "dyad-chat-summary",
+    "dyad-edit",
+    "dyad-search-replace",
+    "dyad-codebase-context",
+    "dyad-web-search-result",
+    "dyad-web-search",
+    "dyad-web-crawl",
+    "dyad-code-search-result",
+    "dyad-code-search",
+    "dyad-read",
+    "think",
+    "dyad-command",
+    "dyad-mcp-tool-call",
+    "dyad-mcp-tool-result",
+  ];
+
   const tagPattern = new RegExp(
-    `<(${DYAD_CUSTOM_TAGS.join("|")})\\s*([^>]*)>(.*?)<\\/\\1>`,
+    `<(${customTagNames.join("|")})\\s*([^>]*)>(.*?)<\\/\\1>`,
     "gs",
   );
 
@@ -499,6 +480,7 @@ function renderCustomTag(
       );
 
     case "dyad-search-replace":
+      // NOTE: Bypass search and replace feature - component now shows content without badge/click events
       return (
         <DyadSearchReplace
           node={{
@@ -584,33 +566,6 @@ function renderCustomTag(
         return <>{mapActionToButton(action)}</>;
       }
       return null;
-
-    case "dyad-list-files":
-      return (
-        <DyadListFiles
-          node={{
-            properties: {
-              directory: attributes.directory || "",
-              state: getState({ isStreaming, inProgress }),
-            },
-          }}
-        >
-          {content}
-        </DyadListFiles>
-      );
-
-    case "dyad-database-schema":
-      return (
-        <DyadDatabaseSchema
-          node={{
-            properties: {
-              state: getState({ isStreaming, inProgress }),
-            },
-          }}
-        >
-          {content}
-        </DyadDatabaseSchema>
-      );
 
     default:
       return null;

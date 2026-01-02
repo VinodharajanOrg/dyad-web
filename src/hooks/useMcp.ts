@@ -1,15 +1,14 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
-import type {
-  McpServer,
-  McpServerUpdate,
-  McpTool,
-  McpToolConsent,
-  CreateMcpServer,
-} from "@/ipc/ipc_types";
+import { IpcClient } from "@/api/ipc_client";
 
 export type Transport = "stdio" | "http";
+
+export type McpServer = any;
+export type McpServerUpdate = any;
+export type McpTool = any;
+export type McpToolConsent = any;
+export type CreateMcpServer = any;
 
 export function useMcp() {
   const queryClient = useQueryClient();
@@ -18,10 +17,12 @@ export function useMcp() {
     queryKey: ["mcp", "servers"],
     queryFn: async () => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) return [];
+      // @ts-ignore
       const list = await ipc.listMcpServers();
       return (list || []) as McpServer[];
     },
-    meta: { showErrorToast: true },
+    meta: { showErrorToast: false },
   });
 
   const serverIds = useMemo(
@@ -34,22 +35,28 @@ export function useMcp() {
     enabled: serverIds.length > 0,
     queryFn: async () => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) return {};
       const entries = await Promise.all(
-        serverIds.map(async (id) => [id, await ipc.listMcpTools(id)] as const),
+        serverIds.map(async (id) => {
+          // @ts-ignore
+          return [id, await ipc.listMcpTools(id)] as const;
+        }),
       );
       return Object.fromEntries(entries) as Record<number, McpTool[]>;
     },
-    meta: { showErrorToast: true },
+    meta: { showErrorToast: false },
   });
 
   const consentsQuery = useQuery<McpToolConsent[], Error>({
     queryKey: ["mcp", "consents"],
     queryFn: async () => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) return [];
+      // @ts-ignore
       const list = await ipc.getMcpToolConsents();
       return (list || []) as McpToolConsent[];
     },
-    meta: { showErrorToast: true },
+    meta: { showErrorToast: false },
   });
 
   const consentsMap = useMemo(() => {
@@ -63,6 +70,8 @@ export function useMcp() {
   const createServerMutation = useMutation({
     mutationFn: async (params: CreateMcpServer) => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) throw new Error("IPC not available in web mode");
+      // @ts-ignore
       return ipc.createMcpServer(params);
     },
     onSuccess: async () => {
@@ -77,6 +86,8 @@ export function useMcp() {
   const updateServerMutation = useMutation({
     mutationFn: async (params: McpServerUpdate) => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) throw new Error("IPC not available in web mode");
+      // @ts-ignore
       return ipc.updateMcpServer(params);
     },
     onSuccess: async () => {
@@ -91,6 +102,8 @@ export function useMcp() {
   const deleteServerMutation = useMutation({
     mutationFn: async (id: number) => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) throw new Error("IPC not available in web mode");
+      // @ts-ignore
       return ipc.deleteMcpServer(id);
     },
     onSuccess: async () => {
@@ -109,6 +122,8 @@ export function useMcp() {
       consent: McpToolConsent["consent"];
     }) => {
       const ipc = IpcClient.getInstance();
+      if (!ipc) throw new Error("IPC not available in web mode");
+      // @ts-ignore
       return ipc.setMcpToolConsent(params);
     },
     onSuccess: async () => {

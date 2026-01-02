@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 
 export const useCheckName = (appName: string) => {
   return useQuery({
     queryKey: ["checkAppName", appName],
     queryFn: async () => {
-      const result = await IpcClient.getInstance().checkAppName({ appName });
+      const ipcClient = IpcClient.getInstance();
+      if (!ipcClient) throw new Error("IPC client is not available");
+      const result = await ipcClient!.checkAppName({ appName });
       return result;
     },
     enabled: !!appName && !!appName.trim(),
@@ -13,5 +15,6 @@ export const useCheckName = (appName: string) => {
     refetchOnMount: false,
     refetchOnReconnect: false,
     retry: false,
+    staleTime: 300000, // 5 minutes
   });
 };

@@ -16,6 +16,5 @@
   "enableAutoFixProblems": false,
   "enableAutoUpdate": true,
   "releaseChannel": "beta",
-  "isRunning": true,
   "isTestMode": true
 }

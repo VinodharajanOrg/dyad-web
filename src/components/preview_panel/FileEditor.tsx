@@ -1,10 +1,11 @@
+"use client";
 import React, { useState, useRef, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
 import { useLoadAppFile } from "@/hooks/useLoadAppFile";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ChevronRight, Circle, Save } from "lucide-react";
-import "@/components/chat/monaco";
-import { IpcClient } from "@/ipc/ipc_client";
+import { initializeMonaco } from "@/components/chat/monaco";
+import { filesApi } from "@/api/endpoints/files";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,12 +129,14 @@ export const FileEditor = ({ appId, filePath }: FileEditorProps) => {
   const editorTheme = isDarkMode ? "dyad-dark" : "dyad-light";
 
   // Handle editor mount
-  const handleEditorDidMount: OnMount = (editor) => {
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+
+    // Initialize Monaco themes and settings
+    initializeMonaco(monaco);
 
     // Listen for model content change events
     editor.onDidBlurEditorText(() => {
-      console.log("Editor text blurred, checking if save needed");
       if (needsSaveRef.current) {
         saveFile();
       }
@@ -164,18 +167,20 @@ export const FileEditor = ({ appId, filePath }: FileEditorProps) => {
       isSavingRef.current = true;
       setIsSaving(true);
 
-      const ipcClient = IpcClient.getInstance();
-      const { warning } = await ipcClient.editAppFile(
+      const result = await filesApi.writeFile(
         appId,
         filePath,
         currentValueRef.current,
       );
+
       await queryClient.invalidateQueries({ queryKey: ["versions", appId] });
       if (settings?.enableAutoFixProblems) {
         checkProblems();
       }
-      if (warning) {
-        showWarning(warning);
+
+      // Show warning if backend reports linting/syntax issues
+      if (result.warning) {
+        showWarning(result.warning);
       } else {
         showSuccess("File saved");
       }
@@ -219,6 +224,11 @@ export const FileEditor = ({ appId, filePath }: FileEditorProps) => {
           theme={editorTheme}
           onChange={handleEditorChange}
           onMount={handleEditorDidMount}
+          loading={
+            <div className="flex items-center justify-center h-full">
+              <div className="text-muted-foreground">Loading editor...</div>
+            </div>
+          }
           options={{
             minimap: { enabled: true },
             scrollBeyondLastLine: false,

@@ -1,11 +1,13 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LightbulbIcon } from "lucide-react";
-import { ErrorComponentProps } from "@tanstack/react-router";
 import { usePostHog } from "posthog-js/react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
-export function ErrorBoundary({ error }: ErrorComponentProps) {
+export function ErrorBoundary({ error }: { error: Error }) {
   const [isLoading, setIsLoading] = useState(false);
   const posthog = usePostHog();
 
@@ -18,7 +20,9 @@ export function ErrorBoundary({ error }: ErrorComponentProps) {
     setIsLoading(true);
     try {
       // Get system debug info
-      const debugInfo = await IpcClient.getInstance().getSystemDebugInfo();
+      const debugInfo = await (
+        IpcClient.getInstance() as any
+      ).getSystemDebugInfo();
 
       // Create a formatted issue body with the debug info and error information
       const issueBody = `
@@ -62,13 +66,11 @@ ${debugInfo.logs.slice(-3_500) || "No logs available"}
       const githubIssueUrl = `https://github.com/dyad-sh/dyad/issues/new?title=${encodedTitle}&labels=bug,filed-from-app,client-error&body=${encodedBody}`;
 
       // Open the pre-filled GitHub issue page
-      await IpcClient.getInstance().openExternalUrl(githubIssueUrl);
+      openExternalUrl(githubIssueUrl);
     } catch (err) {
       console.error("Failed to prepare bug report:", err);
       // Fallback to opening the regular GitHub issue page
-      IpcClient.getInstance().openExternalUrl(
-        "https://github.com/dyad-sh/dyad/issues/new",
-      );
+      openExternalUrl("https://github.com/dyad-sh/dyad/issues/new");
     } finally {
       setIsLoading(false);
     }

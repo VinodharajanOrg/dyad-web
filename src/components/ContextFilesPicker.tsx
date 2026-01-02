@@ -1,3 +1,4 @@
+"use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -165,6 +166,7 @@ export function ContextFilesPicker() {
           </div>
 
           <div className="flex w-full max-w-sm items-center space-x-2">
+            {/* NOTE: Disabling manual context files for now. */}
             <Input
               data-testid="manual-context-files-input"
               type="text"
@@ -176,11 +178,13 @@ export function ContextFilesPicker() {
                   addPath();
                 }
               }}
+              disabled
             />
             <Button
               type="submit"
               onClick={addPath}
               data-testid="manual-context-files-add-button"
+              disabled
             >
               Add
             </Button>
@@ -257,6 +261,7 @@ export function ContextFilesPicker() {
             </div>
 
             <div className="flex w-full max-w-sm items-center space-x-2 mt-4">
+              {/* NOTE: Disabling exclude context files for now. */}
               <Input
                 data-testid="exclude-context-files-input"
                 type="text"
@@ -268,11 +273,13 @@ export function ContextFilesPicker() {
                     addExcludePath();
                   }
                 }}
+                disabled
               />
               <Button
                 type="submit"
                 onClick={addExcludePath}
                 data-testid="exclude-context-files-add-button"
+                disabled
               >
                 Add
               </Button>

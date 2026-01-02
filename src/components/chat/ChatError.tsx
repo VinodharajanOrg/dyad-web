@@ -1,3 +1,4 @@
+"use client";
 import { XCircle, AlertTriangle } from "lucide-react"; // Assuming lucide-react is used
 
 interface ChatErrorProps {

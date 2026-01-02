@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +15,11 @@ import { useCreateApp } from "@/hooks/useCreateApp";
 import { useCheckName } from "@/hooks/useCheckName";
 import { useSetAtom } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
-import { NEON_TEMPLATE_IDS, Template } from "@/shared/templates";
-
-import { useRouter } from "@tanstack/react-router";
+import { Template } from "@/shared/templates";
+import { useRouter } from "next/navigation";
 
 import { Loader2 } from "lucide-react";
-import { neonTemplateHook } from "@/client_logic/template_hook";
+// NOTE: neonTemplateHook removed - not used in web version (Electron-only)
 import { showError } from "@/lib/toast";
 
 interface CreateAppDialogProps {
@@ -53,18 +53,15 @@ export function CreateAppDialog({
     setIsSubmitting(true);
     try {
       const result = await createApp({ name: appName.trim() });
-      if (template && NEON_TEMPLATE_IDS.has(template.id)) {
-        await neonTemplateHook({
-          appId: result.app.id,
-          appName: result.app.name,
-        });
-      }
+      // if (template && NEON_TEMPLATE_IDS.has(template.id)) {
+      //   await neonTemplateHook({
+      //     appId: result.app.id,
+      //     appName: result.app.name,
+      //   });
+      // }
       setSelectedAppId(result.app.id);
       // Navigate to the new app's first chat
-      router.navigate({
-        to: "/chat",
-        search: { id: result.chatId },
-      });
+      router.push(`/${result.appId}/chat?id=${result.chatId}`);
       setAppName("");
       onOpenChange(false);
     } catch (error) {

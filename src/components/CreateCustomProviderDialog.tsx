@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useCustomLanguageModelProvider } from "@/hooks/useCustomLanguageModelProvider";
-import type { LanguageModelProvider } from "@/ipc/ipc_types";
+import type { LanguageModelProvider } from "@/types/ipc_types";
 
 interface CreateCustomProviderDialogProps {
   isOpen: boolean;
@@ -26,7 +27,8 @@ export function CreateCustomProviderDialog({
   onSuccess,
   editingProvider = null,
 }: CreateCustomProviderDialogProps) {
-  const [id, setId] = useState("");
+  const [_id, setId] = useState("");
+  //const [setId] = useState("");
   const [name, setName] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [envVarName, setEnvVarName] = useState("");
@@ -38,10 +40,19 @@ export function CreateCustomProviderDialog({
   // Load provider data when editing
   useEffect(() => {
     if (editingProvider && isOpen) {
-      const cleanId = editingProvider.id?.startsWith("custom::")
-        ? editingProvider.id.replace("custom::", "")
-        : editingProvider.id || "";
-      setId(cleanId);
+      // For backend-generated providers, the id is already a number
+      // For legacy providers with "custom::" prefix, extract the numeric part
+      let numericId: number | string = editingProvider.id;
+
+      if (typeof editingProvider.id === "string") {
+        if (editingProvider.id.startsWith("custom::")) {
+          numericId = editingProvider.id.replace("custom::", "");
+        }
+        // If it's a numeric string, keep it as is
+        numericId = editingProvider.id;
+      }
+
+      setId(String(numericId));
       setName(editingProvider.name || "");
       setApiBaseUrl(editingProvider.apiBaseUrl || "");
       setEnvVarName(editingProvider.envVarName || "");
@@ -61,18 +72,25 @@ export function CreateCustomProviderDialog({
 
     try {
       if (isEditMode && editingProvider) {
-        const cleanId = editingProvider.id?.startsWith("custom::")
-          ? editingProvider.id.replace("custom::", "")
-          : editingProvider.id || "";
+        // For editing, extract the numeric ID from the provider object
+        // The ID can be a number (from backend) or a string (legacy format)
+        const numericId =
+          typeof editingProvider.id === "string"
+            ? parseInt(editingProvider.id.replace(/\D/g, ""), 10)
+            : Number(editingProvider.id);
+
+        if (isNaN(numericId)) {
+          throw new Error("Invalid provider ID");
+        }
+
         await editProvider({
-          id: cleanId,
+          providerId: numericId,
           name: name.trim(),
           apiBaseUrl: apiBaseUrl.trim(),
           envVarName: envVarName.trim() || undefined,
-        });
+        } as Parameters<typeof editProvider>[0]);
       } else {
         await createProvider({
-          id: id.trim(),
           name: name.trim(),
           apiBaseUrl: apiBaseUrl.trim(),
           envVarName: envVarName.trim() || undefined,
@@ -118,7 +136,7 @@ export function CreateCustomProviderDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label htmlFor="id">Provider ID</Label>
             <Input
               id="id"
@@ -131,20 +149,20 @@ export function CreateCustomProviderDialog({
             <p className="text-xs text-muted-foreground">
               A unique identifier for this provider (no spaces).
             </p>
-          </div>
+          </div> */}
 
           <div className="space-y-2">
-            <Label htmlFor="name">Display Name</Label>
+            <Label htmlFor="name">Provider Name</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="E.g., My Provider"
+              placeholder="E.g., my-provider"
               required
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              The name that will be displayed in the UI.
+              The name of the provider (no spaces like google ,openai).
             </p>
           </div>
 

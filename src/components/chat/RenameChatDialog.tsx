@@ -1,6 +1,6 @@
+"use client";
 import { useState } from "react";
-import { IpcClient } from "@/ipc/ipc_client";
-import { showError, showSuccess } from "@/lib/toast";
+import { useUpdateChat } from "@/hooks/useChats";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ export function RenameChatDialog({
   onRename,
 }: RenameChatDialogProps) {
   const [newTitle, setNewTitle] = useState("");
+  const { mutate: updateChat, isPending } = useUpdateChat();
 
   // Reset title when dialog opens
   const handleOpenChange = (open: boolean) => {
@@ -45,21 +46,23 @@ export function RenameChatDialog({
       return;
     }
 
-    try {
-      await IpcClient.getInstance().updateChat({
+    updateChat(
+      {
         chatId,
-        title: newTitle.trim(),
-      });
-      showSuccess("Chat renamed successfully");
+        params: {
+          title: newTitle.trim(),
+        },
+      },
+      {
+        onSuccess: () => {
+          // Call the parent's onRename callback to refresh the chat list
+          onRename();
 
-      // Call the parent's onRename callback to refresh the chat list
-      onRename();
-
-      // Close the dialog
-      handleOpenChange(false);
-    } catch (error) {
-      showError(`Failed to rename chat: ${(error as any).toString()}`);
-    }
+          // Close the dialog
+          handleOpenChange(false);
+        },
+      },
+    );
   };
 
   const handleClose = () => {
@@ -84,8 +87,9 @@ export function RenameChatDialog({
               onChange={(e) => setNewTitle(e.target.value)}
               className="col-span-3"
               placeholder="Enter chat title..."
+              disabled={isPending}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !isPending) {
                   handleSave();
                 }
               }}
@@ -93,11 +97,11 @@ export function RenameChatDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={handleClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!newTitle.trim()}>
-            Save
+          <Button onClick={handleSave} disabled={!newTitle.trim() || isPending}>
+            {isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

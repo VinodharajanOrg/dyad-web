@@ -142,7 +142,7 @@ export type RuntimeMode = z.infer<typeof RuntimeModeSchema>;
 export const RuntimeMode2Schema = z.enum(["host", "docker"]);
 export type RuntimeMode2 = z.infer<typeof RuntimeMode2Schema>;
 
-export const ChatModeSchema = z.enum(["build", "ask", "agent", "local-agent"]);
+export const ChatModeSchema = z.enum(["build", "ask", "agent"]);
 export type ChatMode = z.infer<typeof ChatModeSchema>;
 
 export const GitHubSecretsSchema = z.object({
@@ -155,27 +155,7 @@ export const GithubUserSchema = z.object({
 });
 export type GithubUser = z.infer<typeof GithubUserSchema>;
 
-/**
- * Supabase organization credentials.
- * Each organization has its own OAuth tokens.
- */
-export const SupabaseOrganizationCredentialsSchema = z.object({
-  accessToken: SecretSchema,
-  refreshToken: SecretSchema,
-  expiresIn: z.number(),
-  tokenTimestamp: z.number(),
-});
-export type SupabaseOrganizationCredentials = z.infer<
-  typeof SupabaseOrganizationCredentialsSchema
->;
-
 export const SupabaseSchema = z.object({
-  // Map keyed by organizationSlug -> organization credentials
-  organizations: z
-    .record(z.string(), SupabaseOrganizationCredentialsSchema)
-    .optional(),
-
-  // Legacy fields - kept for backwards compat
   accessToken: SecretSchema.optional(),
   refreshToken: SecretSchema.optional(),
   expiresIn: z.number().optional(),
@@ -192,7 +172,6 @@ export const NeonSchema = z.object({
 export type Neon = z.infer<typeof NeonSchema>;
 
 export const ExperimentsSchema = z.object({
-  enableLocalAgent: z.boolean().optional(),
   // Deprecated
   enableSupabaseIntegration: z.boolean().describe("DEPRECATED").optional(),
   enableFileEditing: z.boolean().describe("DEPRECATED").optional(),
@@ -235,23 +214,12 @@ export type ReleaseChannel = z.infer<typeof ReleaseChannelSchema>;
 export const ZoomLevelSchema = z.enum(["90", "100", "110", "125", "150"]);
 export type ZoomLevel = z.infer<typeof ZoomLevelSchema>;
 
-export const SmartContextModeSchema = z.enum([
-  "balanced",
-  "conservative",
-  "deep",
-]);
-export type SmartContextMode = z.infer<typeof SmartContextModeSchema>;
-
-export const AgentToolConsentSchema = z.enum(["ask", "always"]);
-export type AgentToolConsent = z.infer<typeof AgentToolConsentSchema>;
-
 /**
  * Zod schema for user settings
  */
 export const UserSettingsSchema = z.object({
   selectedModel: LargeLanguageModelSchema,
   providerSettings: z.record(z.string(), ProviderSettingSchema),
-  agentToolConsents: z.record(z.string(), AgentToolConsentSchema).optional(),
   githubUser: GithubUserSchema.optional(),
   githubAccessToken: SecretSchema.optional(),
   vercelAccessToken: SecretSchema.optional(),
@@ -270,7 +238,9 @@ export const UserSettingsSchema = z.object({
   proLazyEditsMode: z.enum(["off", "v1", "v2"]).optional(),
   enableProSmartFilesContextMode: z.boolean().optional(),
   enableProWebSearch: z.boolean().optional(),
-  proSmartContextOption: SmartContextModeSchema.optional(),
+  proSmartContextOption: z
+    .enum(["balanced", "conservative", "deep"])
+    .optional(),
   selectedTemplateId: z.string(),
   enableSupabaseWriteSqlMigration: z.boolean().optional(),
   selectedChatMode: ChatModeSchema.optional(),
@@ -283,17 +253,6 @@ export const UserSettingsSchema = z.object({
   releaseChannel: ReleaseChannelSchema,
   runtimeMode2: RuntimeMode2Schema.optional(),
   customNodePath: z.string().optional().nullable(),
-  isRunning: z.boolean().optional(),
-  lastKnownPerformance: z
-    .object({
-      timestamp: z.number(),
-      memoryUsageMB: z.number(),
-      cpuUsagePercent: z.number().optional(),
-      systemMemoryUsageMB: z.number().optional(),
-      systemMemoryTotalMB: z.number().optional(),
-      systemCpuPercent: z.number().optional(),
-    })
-    .optional(),
 
   ////////////////////////////////
   // E2E TESTING ONLY.
@@ -321,22 +280,11 @@ export function hasDyadProKey(settings: UserSettings): boolean {
   return !!settings.providerSettings?.auto?.apiKey?.value;
 }
 
-export function isSupabaseConnected(settings: UserSettings | null): boolean {
-  if (!settings) {
-    return false;
-  }
-  return Boolean(
-    settings.supabase?.accessToken ||
-      (settings.supabase?.organizations &&
-        Object.keys(settings.supabase.organizations).length > 0),
-  );
-}
-
 export function isTurboEditsV2Enabled(settings: UserSettings): boolean {
   return Boolean(
     isDyadProEnabled(settings) &&
-      settings.enableProLazyEditsMode === true &&
-      settings.proLazyEditsMode === "v2",
+    settings.enableProLazyEditsMode === true &&
+    settings.proLazyEditsMode === "v2",
   );
 }
 

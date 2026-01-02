@@ -21,19 +21,31 @@ export function useParseRouter(appId: number | null) {
     refreshApp,
   } = useLoadApp(appId);
 
-  // Load router related file to extract routes for non-Next apps
-  const {
-    content: routerContent,
-    loading: routerFileLoading,
-    error: routerFileError,
-    refreshFile,
-  } = useLoadAppFile(appId, "src/App.tsx");
-
   // Detect Next.js app by presence of next.config.* in file list
   const isNextApp = useMemo(() => {
     if (!app?.files) return false;
     return app.files.some((f) => f.toLowerCase().includes("next.config"));
   }, [app?.files]);
+
+  // Check if src/App.tsx exists in the project
+  const hasAppTsx = useMemo(() => {
+    if (!app?.files) return false;
+    return app.files.some((f) => f === "src/App.tsx" || f === "src/App.jsx");
+  }, [app?.files]);
+
+  // Only load router file for non-Next apps that actually have src/App.tsx
+  // Next.js uses file-based routing, so we don't need to read src/App.tsx
+  const shouldLoadRouterFile = !isNextApp && hasAppTsx && appId !== null;
+
+  const {
+    content: routerContent,
+    loading: routerFileLoading,
+    error: routerFileError,
+    refreshFile,
+  } = useLoadAppFile(
+    shouldLoadRouterFile ? appId : null,
+    shouldLoadRouterFile ? "src/App.tsx" : null,
+  );
 
   // Parse routes either from Next.js file-based routing or from router file
   useEffect(() => {

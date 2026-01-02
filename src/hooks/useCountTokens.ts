@@ -1,62 +1,51 @@
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
-import type { TokenCountResult } from "@/ipc/ipc_types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { atom, useAtom } from "jotai";
+import { IpcClient } from "@/api/ipc_client";
+// @ts-ignore
+import type { TokenCountResult } from "@/types/ipc_types";
 
-export const TOKEN_COUNT_QUERY_KEY = ["tokenCount"] as const;
+// Create atoms to store the token count state
+export const tokenCountResultAtom = atom<TokenCountResult | null>(null);
+export const tokenCountLoadingAtom = atom<boolean>(false);
+export const tokenCountErrorAtom = atom<Error | null>(null);
 
-export function useCountTokens(chatId: number | null, input: string = "") {
-  const queryClient = useQueryClient();
+export function useCountTokens() {
+  const [result, setResult] = useAtom(tokenCountResultAtom);
+  const [loading, setLoading] = useAtom(tokenCountLoadingAtom);
+  const [error, setError] = useAtom(tokenCountErrorAtom);
 
-  // Debounce input so we don't call the token counting IPC on every keystroke.
-  const [debouncedInput, setDebouncedInput] = useState(input);
+  const countTokens = useCallback(
+    async (chatId: number, input: string) => {
+      setLoading(true);
+      setError(null);
 
-  useEffect(() => {
-    // If there's no chat, don't bother debouncing
-    if (chatId === null) {
-      setDebouncedInput(input);
-      return;
-    }
-
-    const handle = setTimeout(() => {
-      setDebouncedInput(input);
-    }, 1_000);
-
-    return () => clearTimeout(handle);
-  }, [chatId, input]);
-
-  const {
-    data: result = null,
-    isLoading: loading,
-    error,
-    refetch,
-  } = useQuery<TokenCountResult | null>({
-    queryKey: [...TOKEN_COUNT_QUERY_KEY, chatId, debouncedInput],
-    queryFn: async () => {
-      if (chatId === null) return null;
-      return IpcClient.getInstance().countTokens({
-        chatId,
-        input: debouncedInput,
-      });
+      try {
+        const ipcClient = IpcClient.getInstance();
+        if (!ipcClient) {
+          // In web mode, IpcClient is not available, skip token counting
+          console.warn("[useCountTokens] IpcClient not available in web mode");
+          setResult(null);
+          return null;
+        }
+        // @ts-ignore
+        const tokenResult = await ipcClient.countTokens({ chatId, input });
+        setResult(tokenResult);
+        return tokenResult;
+      } catch (error) {
+        console.error("Error counting tokens:", error);
+        setError(error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      } finally {
+        setLoading(false);
+      }
     },
-    placeholderData: keepPreviousData,
-    enabled: chatId !== null,
-  });
-
-  // For imperative invalidation (e.g., after streaming completes)
-  const invalidateTokenCount = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: TOKEN_COUNT_QUERY_KEY });
-  }, [queryClient]);
+    [setLoading, setError, setResult],
+  );
 
   return {
+    countTokens,
     result,
     loading,
     error,
-    refetch,
-    invalidateTokenCount,
   };
 }

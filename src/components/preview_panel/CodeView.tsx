@@ -1,9 +1,11 @@
+"use client";
 import { FileEditor } from "./FileEditor";
 import { FileTree } from "./FileTree";
 import { RefreshCw } from "lucide-react";
 import { useLoadApp } from "@/hooks/useLoadApp";
 import { useAtomValue } from "jotai";
 import { selectedFileAtom } from "@/atoms/viewAtoms";
+import { previewPanelKeyAtom } from "@/atoms/appAtoms";
 
 interface App {
   id?: number;
@@ -19,6 +21,7 @@ export interface CodeViewProps {
 export const CodeView = ({ loading, app }: CodeViewProps) => {
   const selectedFile = useAtomValue(selectedFileAtom);
   const { refreshApp } = useLoadApp(app?.id ?? null);
+  const previewPanelKey = useAtomValue(previewPanelKeyAtom);
 
   if (loading) {
     return <div className="text-center py-4">Loading files...</div>;
@@ -53,7 +56,11 @@ export const CodeView = ({ loading, app }: CodeViewProps) => {
           </div>
           <div className="w-2/3">
             {selectedFile ? (
-              <FileEditor appId={app.id ?? null} filePath={selectedFile.path} />
+              <FileEditor
+                key={`${app.id}-${selectedFile.path}-${previewPanelKey}`}
+                appId={app.id ?? null}
+                filePath={selectedFile.path}
+              />
             ) : (
               <div className="text-center py-4 text-gray-500">
                 Select a file to view

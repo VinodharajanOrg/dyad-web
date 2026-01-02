@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter, usePathname } from "next/navigation";
 import { useSetAtom } from "jotai";
 import { activeSettingsSectionAtom } from "@/atoms/viewAtoms";
 
@@ -17,13 +17,48 @@ export function useScrollAndNavigateTo(
   to: string = "/settings",
   options?: ScrollOptions,
 ) {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const pathname = usePathname();
   const setActiveSection = useSetAtom(activeSettingsSectionAtom);
 
   return useCallback(
     async (id: string) => {
-      await navigate({ to });
-      const element = document.getElementById(id);
+      // Only navigate if not already on the target page
+      if (pathname !== to) {
+        router.push(to);
+      }
+
+      // Wait for the element to appear in the DOM using MutationObserver
+      const element = await new Promise<HTMLElement | null>((resolve) => {
+        // Check immediately in case element exists
+        const existing = document.getElementById(id);
+        if (existing) {
+          resolve(existing);
+          return;
+        }
+
+        // Use MutationObserver to detect when element is added to DOM
+        const observer = new MutationObserver(() => {
+          const el = document.getElementById(id);
+          if (el) {
+            observer.disconnect();
+            resolve(el);
+          }
+        });
+
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: false,
+        });
+
+        // Timeout fallback after 5 seconds
+        const _timeout = setTimeout(() => {
+          observer.disconnect();
+          resolve(document.getElementById(id));
+        }, 2000);
+      });
+
       if (element) {
         element.scrollIntoView({
           behavior: options?.behavior ?? "smooth",
@@ -37,7 +72,8 @@ export function useScrollAndNavigateTo(
       return false;
     },
     [
-      navigate,
+      router,
+      pathname,
       to,
       options?.behavior,
       options?.block,

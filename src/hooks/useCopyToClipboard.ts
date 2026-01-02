@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { getLanguage } from "@/utils/get_language";
+import { COPY_FEEDBACK_DURATION } from "@/lib/constants";
 
 const CUSTOM_TAG_NAMES = [
   "dyad-write",
@@ -42,7 +43,10 @@ export const useCopyToClipboard = () => {
       }
 
       // Set new timeout and store reference
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+      timeoutRef.current = setTimeout(
+        () => setCopied(false),
+        COPY_FEEDBACK_DURATION,
+      );
       return true;
     } catch (error) {
       console.error("Failed to copy content:", error);

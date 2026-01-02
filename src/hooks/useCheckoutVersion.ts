@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
+import { gitApi } from "@/api/endpoints/git";
+import { IpcClient } from "@/api/ipc_client";
 import { useSetAtom } from "jotai";
-import { activeCheckoutCounterAtom } from "@/store/appAtoms";
+import { activeCheckoutCounterAtom } from "@/atoms/appAtoms";
 
 interface CheckoutVersionVariables {
   appId: number;
@@ -16,15 +17,27 @@ export function useCheckoutVersion() {
     useMutation<void, Error, CheckoutVersionVariables>({
       mutationFn: async ({ appId, versionId }) => {
         if (appId === null) {
-          // Should be caught by UI logic before calling, but as a safeguard.
           throw new Error("App ID is null, cannot checkout version.");
         }
-        const ipcClient = IpcClient.getInstance();
-        setActiveCheckouts((prev) => prev + 1); // Increment counter
+        setActiveCheckouts((prev) => prev + 1);
         try {
-          await ipcClient.checkoutVersion({ appId, versionId });
+          // NOTE: Replace IPC with REST - Try REST API first, fallback to IPC
+          try {
+            await gitApi.checkout({ appId, versionId });
+          } catch (restError) {
+            // Fallback to IPC if REST API not implemented
+            console.warn(
+              "Git REST API not available, falling back to IPC:",
+              restError,
+            );
+            const ipcClient = IpcClient.getInstance();
+            if (!ipcClient) {
+              throw new Error("Version control not available");
+            }
+            await (ipcClient as any).checkoutVersion({ appId, versionId });
+          }
         } finally {
-          setActiveCheckouts((prev) => prev - 1); // Decrement counter
+          setActiveCheckouts((prev) => prev - 1);
         }
       },
       onSuccess: (_, variables) => {

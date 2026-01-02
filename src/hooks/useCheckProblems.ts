@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
-import type { ProblemReport } from "@/ipc/ipc_types";
+import { IpcClient } from "@/api/ipc_client";
+import type { ProblemReport } from "@/types/ipc_types";
 import { useSettings } from "./useSettings";
 
 export function useCheckProblems(appId: number | null) {
@@ -17,7 +17,8 @@ export function useCheckProblems(appId: number | null) {
         throw new Error("App ID is required");
       }
       const ipcClient = IpcClient.getInstance();
-      return ipcClient.checkProblems({ appId });
+      if (!ipcClient) throw new Error("IPC client is not available");
+      return ipcClient!.checkProblems({ appId });
     },
     enabled: !!appId && settings?.enableAutoFixProblems,
     // DO NOT SHOW ERROR TOAST.

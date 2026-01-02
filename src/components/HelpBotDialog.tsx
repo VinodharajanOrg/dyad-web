@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
@@ -6,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import { v4 as uuidv4 } from "uuid";
 import { LoadingBlock, VanillaMarkdownParser } from "@/components/LoadingBlock";
 
@@ -75,8 +76,8 @@ export function HelpBotDialog({ isOpen, onClose }: HelpBotDialogProps) {
     setInput("");
     setStreaming(true);
 
-    IpcClient.getInstance().startHelpChat(sessionId, trimmed, {
-      onChunk: (delta) => {
+    (IpcClient.getInstance() as any).startHelpChat(sessionId, trimmed, {
+      onChunk: (delta: any) => {
         // Buffer assistant content; UI will flush on interval for smoothness
         assistantBufferRef.current += delta;
       },

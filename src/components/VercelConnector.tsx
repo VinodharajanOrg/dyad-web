@@ -1,7 +1,8 @@
+"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Globe } from "lucide-react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import { useSettings } from "@/hooks/useSettings";
 import { useLoadApp } from "@/hooks/useLoadApp";
 import { useVercelDeployments } from "@/hooks/useVercelDeployments";
@@ -15,7 +16,7 @@ import {
 import {} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { App } from "@/ipc/ipc_types";
+import { App } from "@/types/ipc_types";
 
 interface VercelConnectorProps {
   appId: number | null;
@@ -73,7 +74,7 @@ function ConnectedVercelConnector({
       <a
         onClick={(e) => {
           e.preventDefault();
-          IpcClient.getInstance().openExternalUrl(
+          openExternalUrl(
             `https://vercel.com/${app.vercelTeamSlug}/${app.vercelProjectName}`,
           );
         }}
@@ -91,9 +92,7 @@ function ConnectedVercelConnector({
               onClick={(e) => {
                 e.preventDefault();
                 if (app.vercelDeploymentUrl) {
-                  IpcClient.getInstance().openExternalUrl(
-                    app.vercelDeploymentUrl,
-                  );
+                  openExternalUrl(app.vercelDeploymentUrl);
                 }
               }}
               className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400 font-mono"
@@ -178,9 +177,7 @@ function ConnectedVercelConnector({
                   <a
                     onClick={(e) => {
                       e.preventDefault();
-                      IpcClient.getInstance().openExternalUrl(
-                        `https://${deployment.url}`,
-                      );
+                      openExternalUrl(`https://${deployment.url}`);
                     }}
                     className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400 text-sm"
                     target="_blank"
@@ -219,9 +216,8 @@ function UnconnectedVercelConnector({
   const [projectSetupMode, setProjectSetupMode] = useState<
     "create" | "existing"
   >("create");
-  const [availableProjects, setAvailableProjects] = useState<VercelProject[]>(
-    [],
-  );
+  //const [availableProjects, _setAvailableProjects] = useState<VercelProject[]>(
+  const [availableProjects] = useState<VercelProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>("");
 
@@ -262,8 +258,9 @@ function UnconnectedVercelConnector({
   const loadAvailableProjects = async () => {
     setIsLoadingProjects(true);
     try {
-      const projects = await IpcClient.getInstance().listVercelProjects();
-      setAvailableProjects(projects);
+      // NOTE: IPC client would be null in web mode
+      // const projects = await IpcClient.getInstance().listVercelProjects();
+      // setAvailableProjects(projects);
     } catch (error) {
       console.error("Failed to load Vercel projects:", error);
     } finally {
@@ -280,9 +277,10 @@ function UnconnectedVercelConnector({
     setTokenSuccess(false);
 
     try {
-      await IpcClient.getInstance().saveVercelAccessToken({
-        token: accessToken.trim(),
-      });
+      // NOTE: IPC client would be null in web mode
+      // await IpcClient.getInstance().saveVercelAccessToken({
+      //   token: accessToken.trim(),
+      // });
       setTokenSuccess(true);
       setAccessToken("");
       refreshSettings();
@@ -299,13 +297,14 @@ function UnconnectedVercelConnector({
     if (!name) return;
     setIsCheckingProject(true);
     try {
-      const result = await IpcClient.getInstance().isVercelProjectAvailable({
-        name,
-      });
-      setProjectAvailable(result.available);
-      if (!result.available) {
-        setProjectCheckError(result.error || "Project name is not available.");
-      }
+      // NOTE: IPC client would be null in web mode
+      // const result = await IpcClient.getInstance().isVercelProjectAvailable({
+      //   name,
+      // });
+      // setProjectAvailable(result.available);
+      // if (!result.available) {
+      //   setProjectCheckError(result.error || "Project name is not available.");
+      // }
     } catch (err: any) {
       setProjectCheckError(
         err.message || "Failed to check project availability.",
@@ -337,15 +336,17 @@ function UnconnectedVercelConnector({
 
     try {
       if (projectSetupMode === "create") {
-        await IpcClient.getInstance().createVercelProject({
-          name: projectName,
-          appId,
-        });
+        // NOTE: IPC client would be null in web mode
+        // await IpcClient.getInstance().createVercelProject({
+        //   name: projectName,
+        //   appId,
+        // });
       } else {
-        await IpcClient.getInstance().connectToExistingVercelProject({
-          projectId: selectedProject,
-          appId,
-        });
+        // NOTE: IPC client would be null in web mode
+        // await IpcClient.getInstance().connectToExistingVercelProject({
+        //   projectId: selectedProject,
+        //   appId,
+        // });
       }
       setCreateProjectSuccess(true);
       setProjectCheckError(null);
@@ -383,9 +384,7 @@ function UnconnectedVercelConnector({
               <div className="flex gap-2 mt-3">
                 <Button
                   onClick={() => {
-                    IpcClient.getInstance().openExternalUrl(
-                      "https://vercel.com/signup",
-                    );
+                    openExternalUrl("https://vercel.com/signup");
                   }}
                   variant="outline"
                   className="flex-1"
@@ -394,7 +393,7 @@ function UnconnectedVercelConnector({
                 </Button>
                 <Button
                   onClick={() => {
-                    IpcClient.getInstance().openExternalUrl(
+                    openExternalUrl(
                       "https://vercel.com/account/settings/tokens",
                     );
                   }}

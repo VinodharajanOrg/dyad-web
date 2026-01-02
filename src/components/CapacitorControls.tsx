@@ -1,7 +1,8 @@
+"use client";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import { showSuccess } from "@/lib/toast";
 import {
   Smartphone,
@@ -43,7 +44,11 @@ export function CapacitorControls({ appId }: CapacitorControlsProps) {
   // Check if Capacitor is installed
   const { data: isCapacitor, isLoading } = useQuery({
     queryKey: ["is-capacitor", appId],
-    queryFn: () => IpcClient.getInstance().isCapacitor({ appId }),
+    queryFn: () => {
+      const client = IpcClient.getInstance();
+      if (!client) return false;
+      return (client as any).isCapacitor({ appId });
+    },
     enabled: appId !== undefined && appId !== null,
   });
 
@@ -56,12 +61,14 @@ export function CapacitorControls({ appId }: CapacitorControlsProps) {
   // Sync and open iOS mutation
   const syncAndOpenIosMutation = useMutation({
     mutationFn: async () => {
+      const ipcClient = IpcClient.getInstance();
+      if (!ipcClient) return;
       setIosStatus("syncing");
       // First sync
-      await IpcClient.getInstance().syncCapacitor({ appId });
+      await (ipcClient as any).syncCapacitor({ appId });
       setIosStatus("opening");
       // Then open iOS
-      await IpcClient.getInstance().openIos({ appId });
+      await (ipcClient as any).openIos({ appId });
     },
     onSuccess: () => {
       setIosStatus("idle");
@@ -76,12 +83,14 @@ export function CapacitorControls({ appId }: CapacitorControlsProps) {
   // Sync and open Android mutation
   const syncAndOpenAndroidMutation = useMutation({
     mutationFn: async () => {
+      const ipcClient = IpcClient.getInstance();
+      if (!ipcClient) return;
       setAndroidStatus("syncing");
       // First sync
-      await IpcClient.getInstance().syncCapacitor({ appId });
+      await (ipcClient as any).syncCapacitor({ appId });
       setAndroidStatus("opening");
       // Then open Android
-      await IpcClient.getInstance().openAndroid({ appId });
+      await (ipcClient as any).openAndroid({ appId });
     },
     onSuccess: () => {
       setAndroidStatus("idle");
@@ -135,9 +144,12 @@ export function CapacitorControls({ appId }: CapacitorControlsProps) {
               size="sm"
               onClick={() => {
                 // TODO: Add actual help link
-                IpcClient.getInstance().openExternalUrl(
-                  "https://dyad.sh/docs/guides/mobile-app#troubleshooting",
-                );
+                const ipcClient = IpcClient.getInstance();
+                if (ipcClient) {
+                  (ipcClient as any).openExternalUrl(
+                    "https://dyad.sh/docs/guides/mobile-app#troubleshooting",
+                  );
+                }
               }}
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1"
             >

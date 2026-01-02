@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { Zap } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";

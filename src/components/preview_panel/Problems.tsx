@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
@@ -10,7 +11,7 @@ import {
   RefreshCw,
   Check,
 } from "lucide-react";
-import { Problem, ProblemReport } from "@/ipc/ipc_types";
+import { ProblemReport } from "@/types/ipc_types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -20,7 +21,7 @@ import { createProblemFixPrompt } from "@/shared/problem_prompt";
 import { showError } from "@/lib/toast";
 
 interface ProblemItemProps {
-  problem: Problem;
+  problem: any;
   checked: boolean;
   onToggle: () => void;
 }
@@ -218,8 +219,7 @@ export function _Problems() {
   const selectedAppId = useAtomValue(selectedAppIdAtom);
   const { problemReport } = useCheckProblems(selectedAppId);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const problemKey = (p: Problem) =>
-    `${p.file}:${p.line}:${p.column}:${p.code}`;
+  const problemKey = (p: any) => `${p.file}:${p.line}:${p.column}:${p.code}`;
   const { streamMessage } = useStreamChat();
   const [selectedChatId] = useAtom(selectedChatIdAtom);
 
@@ -271,18 +271,18 @@ export function _Problems() {
         appId={selectedAppId}
         selectedCount={
           [...selectedKeys].filter((key) =>
-            problemReport.problems.some((p) => problemKey(p) === key),
+            problemReport.problems.some((p: any) => problemKey(p) === key),
           ).length
         }
         onClearAll={() => setSelectedKeys(new Set())}
         onSelectAll={() =>
           setSelectedKeys(
-            new Set(problemReport.problems.map((p) => problemKey(p))),
+            new Set(problemReport.problems.map((p: any) => problemKey(p))),
           )
         }
         onFixSelected={() => {
           if (!selectedChatId) return;
-          const selectedProblems = problemReport.problems.filter((p) =>
+          const selectedProblems = problemReport.problems.filter((p: any) =>
             selectedKeys.has(problemKey(p)),
           );
           const subsetReport: ProblemReport = { problems: selectedProblems };
@@ -293,7 +293,7 @@ export function _Problems() {
         }}
       />
       <div className="flex-1 overflow-y-auto">
-        {problemReport.problems.map((problem) => {
+        {problemReport.problems.map((problem: any) => {
           const selKey = problemKey(problem);
           const checked = selectedKeys.has(selKey);
           return (

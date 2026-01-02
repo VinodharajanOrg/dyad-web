@@ -1,3 +1,4 @@
+"use client";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   $getRoot,
@@ -90,13 +91,7 @@ function CustomMenu({ loading: _loading, ...props }: any) {
 }
 
 // Plugin to handle Enter key
-function EnterKeyPlugin({
-  onSubmit,
-  disableSendButton,
-}: {
-  onSubmit: () => void;
-  disableSendButton: boolean;
-}) {
+function EnterKeyPlugin({ onSubmit }: { onSubmit: () => void }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
@@ -115,7 +110,7 @@ function EnterKeyPlugin({
           return false;
         }
 
-        if (!event.shiftKey && !disableSendButton) {
+        if (!event.shiftKey) {
           event.preventDefault();
           onSubmit();
           return true;
@@ -124,7 +119,7 @@ function EnterKeyPlugin({
       },
       COMMAND_PRIORITY_HIGH, // Use higher priority to catch before mentions plugin
     );
-  }, [editor, onSubmit, disableSendButton]);
+  }, [editor, onSubmit]);
 
   return null;
 }
@@ -237,7 +232,6 @@ interface LexicalChatInputProps {
   placeholder?: string;
   disabled?: boolean;
   excludeCurrentApp: boolean;
-  disableSendButton: boolean;
 }
 
 function onError(error: Error) {
@@ -252,7 +246,6 @@ export function LexicalChatInput({
   excludeCurrentApp,
   placeholder = "Ask Dyad to build...",
   disabled = false,
-  disableSendButton,
 }: LexicalChatInputProps) {
   const { apps } = useLoadApps();
   const { prompts } = usePrompts();
@@ -410,10 +403,7 @@ export function LexicalChatInput({
         />
         <OnChangePlugin onChange={handleEditorChange} />
         <HistoryPlugin />
-        <EnterKeyPlugin
-          onSubmit={handleSubmit}
-          disableSendButton={disableSendButton}
-        />
+        <EnterKeyPlugin onSubmit={handleSubmit} />
         <ExternalValueSyncPlugin
           value={value}
           promptsById={Object.fromEntries(

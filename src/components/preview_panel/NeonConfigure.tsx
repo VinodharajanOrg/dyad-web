@@ -1,3 +1,4 @@
+"use client";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 
@@ -7,11 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Database, GitBranch } from "lucide-react";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useLoadApp } from "@/hooks/useLoadApp";
-import { IpcClient } from "@/ipc/ipc_client";
-import type { GetNeonProjectResponse, NeonBranch } from "@/ipc/ipc_types";
+import { IpcClient } from "@/api/ipc_client";
 import { NeonDisconnectButton } from "@/components/NeonDisconnectButton";
 
-const getBranchTypeColor = (type: NeonBranch["type"]) => {
+const getBranchTypeColor = (type: any) => {
   switch (type) {
     case "production":
       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
@@ -39,12 +39,12 @@ export const NeonConfigure = () => {
     data: neonProject,
     isLoading,
     error,
-  } = useQuery<GetNeonProjectResponse, Error>({
+  } = useQuery<any, Error>({
     queryKey: ["neon-project", selectedAppId],
     queryFn: async () => {
       if (!selectedAppId) throw new Error("No app selected");
       const ipcClient = IpcClient.getInstance();
-      return await ipcClient.getNeonProject({ appId: selectedAppId });
+      return await (ipcClient as any).getNeonProject({ appId: selectedAppId });
     },
     enabled: !!selectedAppId && !!app?.neonProjectId,
     meta: { showErrorToast: true },
@@ -139,7 +139,7 @@ export const NeonConfigure = () => {
             Branches ({neonProject.branches.length})
           </div>
           <div className="space-y-2">
-            {neonProject.branches.map((branch) => (
+            {neonProject.branches.map((branch: any) => (
               <div
                 key={branch.branchId}
                 className="flex items-center justify-between p-3 border rounded-md"

@@ -1,3 +1,4 @@
+"use client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";

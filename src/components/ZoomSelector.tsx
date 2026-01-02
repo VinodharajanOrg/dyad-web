@@ -1,3 +1,4 @@
+"use client";
 import { useMemo } from "react";
 import { useSettings } from "@/hooks/useSettings";
 import { ZoomLevel, ZoomLevelSchema } from "@/lib/schemas";

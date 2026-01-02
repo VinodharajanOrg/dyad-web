@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+import React, { useEffect, useState } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +17,7 @@ import {
 import { chatInputValueAtom } from "@/atoms/chatAtoms";
 import { useAtom } from "jotai";
 import { useSettings } from "@/hooks/useSettings";
-import { IpcClient } from "@/ipc/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 interface TokenBarProps {
   chatId?: number;
@@ -24,15 +25,31 @@ interface TokenBarProps {
 
 export function TokenBar({ chatId }: TokenBarProps) {
   const [inputValue] = useAtom(chatInputValueAtom);
+  const { countTokens, result } = useCountTokens();
+  const [error, setError] = useState<string | null>(null);
   const { settings } = useSettings();
-  const { result, error } = useCountTokens(chatId ?? null, inputValue);
+  useEffect(() => {
+    if (!chatId) return;
+    // Mark this as used, we need to re-trigger token count
+    // when selected model changes.
+    void settings?.selectedModel;
+
+    const debounceTimer = setTimeout(() => {
+      countTokens(chatId, inputValue).catch((err) => {
+        setError("Failed to count tokens");
+        console.error("Token counting error:", err);
+      });
+    }, 500);
+
+    return () => clearTimeout(debounceTimer);
+  }, [chatId, inputValue, countTokens, settings?.selectedModel]);
 
   if (!chatId || !result) {
     return null;
   }
 
   const {
-    estimatedTotalTokens: totalTokens,
+    totalTokens,
     messageHistoryTokens,
     codebaseTokens,
     mentionedAppsTokens,
@@ -126,9 +143,7 @@ export function TokenBar({ chatId }: TokenBarProps) {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {error && (
-        <div className="text-red-500 text-xs mt-1">Failed to count tokens</div>
-      )}
+      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
       {(!settings?.enableProSmartFilesContextMode ||
         !settings?.enableDyadPro) && (
         <div className="text-xs text-center text-muted-foreground mt-2">
@@ -136,12 +151,10 @@ export function TokenBar({ chatId }: TokenBarProps) {
           <a
             onClick={() =>
               settings?.enableDyadPro
-                ? IpcClient.getInstance().openExternalUrl(
+                ? openExternalUrl(
                     "https://www.dyad.sh/docs/guides/ai-models/pro-modes#smart-context",
                   )
-                : IpcClient.getInstance().openExternalUrl(
-                    "https://dyad.sh/pro#ai",
-                  )
+                : openExternalUrl("https://dyad.sh/pro#ai")
             }
             className="text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
           >

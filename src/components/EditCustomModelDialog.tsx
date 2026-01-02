@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -10,19 +11,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IpcClient } from "@/ipc/ipc_client";
-import { useSettings } from "@/hooks/useSettings";
-import { useMutation } from "@tanstack/react-query";
+import { languageModelsApi } from "@/api/endpoints/language-models";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { showError, showSuccess } from "@/lib/toast";
 
 interface Model {
+  id: number;
   apiName: string;
   displayName: string;
   description?: string;
   maxOutputTokens?: number;
   contextWindow?: number;
-  type: "cloud" | "custom";
-  tag?: string;
+  approved?: boolean;
 }
 
 interface EditCustomModelDialogProps {
@@ -45,9 +45,9 @@ export function EditCustomModelDialog({
   const [description, setDescription] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
   const [contextWindow, setContextWindow] = useState<string>("");
-  const { settings, updateSettings } = useSettings();
+  const [approved, setApproved] = useState(true);
 
-  const ipcClient = IpcClient.getInstance();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (model) {
@@ -56,6 +56,7 @@ export function EditCustomModelDialog({
       setDescription(model.description || "");
       setMaxOutputTokens(model.maxOutputTokens?.toString() || "");
       setContextWindow(model.contextWindow?.toString() || "");
+      setApproved(model.approved ?? true);
     }
   }, [model]);
 
@@ -63,51 +64,36 @@ export function EditCustomModelDialog({
     mutationFn: async () => {
       if (!model) throw new Error("No model to edit");
 
-      const newParams = {
-        apiName,
-        displayName,
-        providerId,
-        description: description || undefined,
+      if (!apiName) throw new Error("Model API name is required");
+      if (!displayName) throw new Error("Model display name is required");
+      if (maxOutputTokens && isNaN(parseInt(maxOutputTokens, 10)))
+        throw new Error("Max Output Tokens must be a valid number");
+      if (contextWindow && isNaN(parseInt(contextWindow, 10)))
+        throw new Error("Context Window must be a valid number");
+
+      const params = {
+        apiName: apiName.trim(),
+        displayName: displayName.trim(),
+        description: description.trim() || undefined,
         maxOutputTokens: maxOutputTokens
           ? parseInt(maxOutputTokens, 10)
           : undefined,
         contextWindow: contextWindow ? parseInt(contextWindow, 10) : undefined,
+        approved,
       };
 
-      if (!newParams.apiName) throw new Error("Model API name is required");
-      if (!newParams.displayName)
-        throw new Error("Model display name is required");
-      if (maxOutputTokens && isNaN(newParams.maxOutputTokens ?? NaN))
-        throw new Error("Max Output Tokens must be a valid number");
-      if (contextWindow && isNaN(newParams.contextWindow ?? NaN))
-        throw new Error("Context Window must be a valid number");
-
-      // First delete the old model
-      await ipcClient.deleteCustomModel({
-        providerId,
-        modelApiName: model.apiName,
-      });
-
-      // Then create the new model
-      await ipcClient.createCustomLanguageModel(newParams);
+      return languageModelsApi.update(model.id, params);
     },
-    onSuccess: async () => {
-      if (
-        settings?.selectedModel?.name === model?.apiName &&
-        settings?.selectedModel?.provider === providerId
-      ) {
-        const newModel = {
-          ...settings.selectedModel,
-          name: apiName,
-        };
-        try {
-          await updateSettings({ selectedModel: newModel });
-        } catch {
-          showError("Failed to update settings");
-          return; // stop closing dialog
-        }
-      }
+    onSuccess: () => {
       showSuccess("Custom model updated successfully!");
+      // Invalidate the models cache to trigger a refetch
+      queryClient.invalidateQueries({
+        queryKey: ["language-models", providerId],
+      });
+      // Invalidate ModelPicker's language-models-by-providers cache
+      queryClient.invalidateQueries({
+        queryKey: ["language-models-by-providers"],
+      });
       onSuccess();
       onClose();
     },

@@ -1,3 +1,4 @@
+"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,9 +8,11 @@ import {
   AlertTriangle,
   ChevronRight,
 } from "lucide-react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import { useSettings } from "@/hooks/useSettings";
 import { useLoadApp } from "@/hooks/useLoadApp";
+import { openExternalUrl } from "@/utils/openExternalUrl";
+import { COPY_FEEDBACK_DURATION } from "@/lib/constants";
 import {
   Select,
   SelectContent,
@@ -81,7 +84,7 @@ function ConnectedGitHubConnector({
     setIsDisconnecting(true);
     setDisconnectError(null);
     try {
-      await IpcClient.getInstance().disconnectGithubRepo(appId);
+      await (IpcClient.getInstance() as any).disconnectGithubRepo(appId);
       refreshApp();
     } catch (err: any) {
       setDisconnectError(err.message || "Failed to disconnect repository.");
@@ -98,7 +101,7 @@ function ConnectedGitHubConnector({
       setShowForceDialog(false);
 
       try {
-        const result = await IpcClient.getInstance().syncGithubRepo(
+        const result = await (IpcClient.getInstance() as any).syncGithubRepo(
           appId,
           force,
         );
@@ -142,7 +145,7 @@ function ConnectedGitHubConnector({
       <a
         onClick={(e) => {
           e.preventDefault();
-          IpcClient.getInstance().openExternalUrl(
+          openExternalUrl(
             `https://github.com/${app.githubOrg}/${app.githubRepo}`,
           );
         }}
@@ -203,7 +206,7 @@ function ConnectedGitHubConnector({
             <a
               onClick={(e) => {
                 e.preventDefault();
-                IpcClient.getInstance().openExternalUrl(
+                openExternalUrl(
                   "https://www.dyad.sh/docs/integrations/github#troubleshooting",
                 );
               }}
@@ -342,6 +345,13 @@ export function UnconnectedGitHubConnector({
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleConnectToGithub = async () => {
+    // Check if IPC client is available (null in web mode)
+    const ipcClient = IpcClient.getInstance();
+    if (!ipcClient) {
+      setGithubError("GitHub integration not available in web mode");
+      return;
+    }
+
     setIsConnectingToGithub(true);
     setGithubError(null);
     setGithubUserCode(null);
@@ -349,15 +359,22 @@ export function UnconnectedGitHubConnector({
     setGithubStatusMessage("Requesting device code from GitHub...");
 
     // Send IPC message to main process to start the flow
-    IpcClient.getInstance().startGithubDeviceFlow(appId);
+    (ipcClient as any).startGithubDeviceFlow(appId);
   };
 
   useEffect(() => {
+    // Check if IPC client is available (null in web mode)
+    const ipcClient = IpcClient.getInstance();
+    if (!ipcClient) {
+      // Skip GitHub device flow listeners in web mode
+      return;
+    }
+
     const cleanupFunctions: (() => void)[] = [];
 
     // Listener for updates (user code, verification uri, status messages)
-    const removeUpdateListener =
-      IpcClient.getInstance().onGithubDeviceFlowUpdate((data) => {
+    const removeUpdateListener = (ipcClient as any).onGithubDeviceFlowUpdate(
+      (data: any) => {
         console.log("Received github:flow-update", data);
         if (data.userCode) {
           setGithubUserCode(data.userCode);
@@ -377,12 +394,13 @@ export function UnconnectedGitHubConnector({
         if (data.userCode && data.verificationUri) {
           setIsConnectingToGithub(true); // Still connecting until success/error
         }
-      });
+      },
+    );
     cleanupFunctions.push(removeUpdateListener);
 
     // Listener for success
-    const removeSuccessListener =
-      IpcClient.getInstance().onGithubDeviceFlowSuccess((data) => {
+    const removeSuccessListener = (ipcClient as any).onGithubDeviceFlowSuccess(
+      (data: any) => {
         console.log("Received github:flow-success", data);
         setGithubStatusMessage("Successfully connected to GitHub!");
         setGithubUserCode(null); // Clear user-facing info
@@ -391,12 +409,13 @@ export function UnconnectedGitHubConnector({
         setIsConnectingToGithub(false);
         refreshSettings();
         setIsExpanded(true);
-      });
+      },
+    );
     cleanupFunctions.push(removeSuccessListener);
 
     // Listener for errors
-    const removeErrorListener = IpcClient.getInstance().onGithubDeviceFlowError(
-      (data) => {
+    const removeErrorListener = (ipcClient as any).onGithubDeviceFlowError(
+      (data: any) => {
         console.log("Received github:flow-error", data);
         setGithubError(data.error || "An unknown error occurred.");
         setGithubStatusMessage(null);
@@ -429,7 +448,7 @@ export function UnconnectedGitHubConnector({
   const loadAvailableRepos = async () => {
     setIsLoadingRepos(true);
     try {
-      const repos = await IpcClient.getInstance().listGithubRepos();
+      const repos = await (IpcClient.getInstance() as any).listGithubRepos();
       setAvailableRepos(repos);
     } catch (error) {
       console.error("Failed to load GitHub repos:", error);
@@ -453,14 +472,13 @@ export function UnconnectedGitHubConnector({
     setCustomBranchName(""); // Clear custom branch name
     try {
       const [owner, repo] = selectedRepo.split("/");
-      const branches = await IpcClient.getInstance().getGithubRepoBranches(
-        owner,
-        repo,
-      );
+      const branches = await (
+        IpcClient.getInstance() as any
+      ).getGithubRepoBranches(owner, repo);
       setAvailableBranches(branches);
       // Default to main if available, otherwise first branch
       const defaultBranch =
-        branches.find((b) => b.name === "main" || b.name === "master") ||
+        branches.find((b: any) => b.name === "main" || b.name === "master") ||
         branches[0];
       if (defaultBranch) {
         setSelectedBranch(defaultBranch.name);
@@ -479,10 +497,9 @@ export function UnconnectedGitHubConnector({
       if (!name) return;
       setIsCheckingRepo(true);
       try {
-        const result = await IpcClient.getInstance().checkGithubRepoAvailable(
-          githubOrg,
-          name,
-        );
+        const result = await (
+          IpcClient.getInstance() as any
+        ).checkGithubRepoAvailable(githubOrg, name);
         setRepoAvailable(result.available);
         if (!result.available) {
           setRepoCheckError(
@@ -520,7 +537,7 @@ export function UnconnectedGitHubConnector({
 
     try {
       if (repoSetupMode === "create") {
-        await IpcClient.getInstance().createGithubRepo(
+        await (IpcClient.getInstance() as any).createGithubRepo(
           githubOrg,
           repoName,
           appId,
@@ -530,7 +547,7 @@ export function UnconnectedGitHubConnector({
         const [owner, repo] = selectedRepo.split("/");
         const branchToUse =
           branchInputMode === "custom" ? customBranchName : selectedBranch;
-        await IpcClient.getInstance().connectToExistingGithubRepo(
+        await (IpcClient.getInstance() as any).connectToExistingGithubRepo(
           owner,
           repo,
           branchToUse,
@@ -603,9 +620,7 @@ export function UnconnectedGitHubConnector({
                     href={githubVerificationUri} // Make it a direct link
                     onClick={(e) => {
                       e.preventDefault();
-                      IpcClient.getInstance().openExternalUrl(
-                        githubVerificationUri,
-                      );
+                      openExternalUrl(githubVerificationUri);
                     }}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -627,7 +642,10 @@ export function UnconnectedGitHubConnector({
                           .writeText(githubUserCode)
                           .then(() => {
                             setCodeCopied(true);
-                            setTimeout(() => setCodeCopied(false), 2000);
+                            setTimeout(
+                              () => setCodeCopied(false),
+                              COPY_FEEDBACK_DURATION,
+                            );
                           })
                           .catch((err) =>
                             console.error("Failed to copy code:", err),
@@ -902,6 +920,13 @@ export function GitHubConnector({
   folderName,
   expanded,
 }: GitHubConnectorProps) {
+  // Check if IPC client is available (null in web mode)
+  const ipcClient = IpcClient.getInstance();
+  if (!ipcClient) {
+    // GitHub integration not available in web mode
+    return null;
+  }
+
   const { app, refreshApp } = useLoadApp(appId);
   const { settings, refreshSettings } = useSettings();
   const [pendingAutoSync, setPendingAutoSync] = useState(false);

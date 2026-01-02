@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { useSettings } from "@/hooks/useSettings";
 import {
@@ -7,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MAX_CHAT_TURNS_IN_CONTEXT } from "@/constants/settings_constants";
+import { MAX_CHAT_TURNS_IN_CONTEXT } from "@/lib/constants";
 
 interface OptionInfo {
   value: string;

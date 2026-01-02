@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
@@ -21,8 +23,7 @@ import {
 } from "lucide-react";
 import { showError, showSuccess } from "@/lib/toast";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { NeonConfigure } from "./NeonConfigure";
 
 const EnvironmentVariablesTitle = () => (
@@ -54,32 +55,35 @@ export const ConfigurePanel = () => {
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Query to get environment variables
   const {
     data: envVars = [],
     isLoading,
     error,
-  } = useQuery({
+  } = useQuery<{ key: string; value: string }[]>({
     queryKey: ["app-env-vars", selectedAppId],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ key: string; value: string }[]> => {
       if (!selectedAppId) return [];
-      const ipcClient = IpcClient.getInstance();
-      return await ipcClient.getAppEnvVars({ appId: selectedAppId });
+      // NOTE: IPC client would be null in web mode
+      // const ipcClient = IpcClient.getInstance();
+      // return await ipcClient.getAppEnvVars({ appId: selectedAppId });
+      return [];
     },
     enabled: !!selectedAppId,
   });
 
   // Mutation to save environment variables
   const saveEnvVarsMutation = useMutation({
-    mutationFn: async (newEnvVars: { key: string; value: string }[]) => {
+    mutationFn: async (_newEnvVars: { key: string; value: string }[]) => {
       if (!selectedAppId) throw new Error("No app selected");
-      const ipcClient = IpcClient.getInstance();
-      return await ipcClient.setAppEnvVars({
-        appId: selectedAppId,
-        envVars: newEnvVars,
-      });
+      // NOTE: IPC client would be null in web mode
+      // const ipcClient = IpcClient.getInstance();
+      // return await ipcClient.setAppEnvVars({
+      //   appId: selectedAppId,
+      //   envVars: newEnvVars,
+      // });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -384,10 +388,7 @@ export const ConfigurePanel = () => {
               className="w-full text-sm justify-between"
               onClick={() => {
                 if (selectedAppId) {
-                  navigate({
-                    to: "/app-details",
-                    search: { appId: selectedAppId },
-                  });
+                  router.push(`/app-details?appId=${selectedAppId}`);
                 }
               }}
             >

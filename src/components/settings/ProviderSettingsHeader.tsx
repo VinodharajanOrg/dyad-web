@@ -1,3 +1,4 @@
+"use client";
 import {
   ArrowLeft,
   ArrowUp,
@@ -8,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IpcClient } from "@/ipc/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import {
   Popover,
   PopoverContent,
@@ -53,7 +54,7 @@ export function ProviderSettingsHeader({
   const handleGetApiKeyClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (providerWebsiteUrl) {
-      IpcClient.getInstance().openExternalUrl(providerWebsiteUrl);
+      openExternalUrl(providerWebsiteUrl);
     }
   };
 

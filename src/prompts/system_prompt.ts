@@ -1,10 +1,12 @@
 import path from "node:path";
 import fs from "node:fs";
-import log from "electron-log";
 import { TURBO_EDITS_V2_SYSTEM_PROMPT } from "../pro/main/prompts/turbo_edits_v2_prompt";
-import { constructLocalAgentPrompt } from "./local_agent_prompt";
 
-const logger = log.scope("system_prompt");
+const logger = {
+  info: (...args: any[]) => console.log("[system_prompt]", ...args),
+  warn: (...args: any[]) => console.warn("[system_prompt]", ...args),
+  error: (...args: any[]) => console.error("[system_prompt]", ...args),
+};
 
 export const THINKING_PROMPT = `
 # Thinking Process
@@ -510,13 +512,9 @@ export const constructSystemPrompt = ({
   enableTurboEditsV2,
 }: {
   aiRules: string | undefined;
-  chatMode?: "build" | "ask" | "agent" | "local-agent";
+  chatMode?: "build" | "ask" | "agent";
   enableTurboEditsV2: boolean;
 }) => {
-  if (chatMode === "local-agent") {
-    return constructLocalAgentPrompt(aiRules);
-  }
-
   const systemPrompt = getSystemPromptForChatMode({
     chatMode,
     enableTurboEditsV2,

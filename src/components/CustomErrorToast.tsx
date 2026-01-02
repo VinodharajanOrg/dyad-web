@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { toast } from "sonner";
 import { X, Copy, Check } from "lucide-react";

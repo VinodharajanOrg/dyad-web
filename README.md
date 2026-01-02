@@ -1,4 +1,4 @@
-# Dyad
+# Dyad Web Frontend
 
 Dyad is a local, open-source AI app builder. It's fast, private, and fully under your control — like Lovable, v0, or Bolt, but running right on your machine.
 
@@ -6,11 +6,18 @@ Dyad is a local, open-source AI app builder. It's fast, private, and fully under
 
 More info at: [https://dyad.sh/](https://dyad.sh/)
 
+## 📋 About This Repository
+
+This is the **Next.js frontend** for Dyad Web. It requires a separate backend server to function.
+
+**Backend:** The backend API server is maintained in a separate repository. Ensure it's running before starting the frontend.
+
 ## 🚀 Features
 
 - ⚡️ **Local**: Fast, private and no lock-in.
 - 🛠 **Bring your own keys**: Use your own AI API keys — no vendor lock-in.
 - 🖥️ **Cross-platform**: Easy to run on Mac or Windows.
+- 🌐 **Next.js 15**: Modern React framework with App Router
 
 ## 📦 Download
 
@@ -24,7 +31,7 @@ Join our growing community of AI app builders on **Reddit**: [r/dyadbuilders](ht
 
 ## 🛠️ Contributing
 
-**Dyad** is open-source (see License info below).
+**Dyad** is open-source (Apache 2.0 licensed).
 
 If you're interested in contributing to dyad, please read our [contributing](./CONTRIBUTING.md) doc.
 

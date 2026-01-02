@@ -1,3 +1,4 @@
+"use client";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -66,9 +67,9 @@ export function VertexConfiguration() {
 
   const isConfigured = Boolean(
     (projectId.trim() && location && serviceAccountKey) ||
-      (existing.projectId &&
-        existing.location &&
-        existing.serviceAccountKey?.value),
+    (existing.projectId &&
+      existing.location &&
+      existing.serviceAccountKey?.value),
   );
 
   return (

@@ -1,5 +1,5 @@
+"use client";
 import { useMemo, useState } from "react";
-
 import { Bell, Loader2, CheckCircle2 } from "lucide-react";
 import {
   Popover,
@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ChatSummary } from "@/lib/schemas";
+import { useAllChats } from "@/hooks/useChats";
 import { useAtomValue } from "jotai";
 import {
   isStreamingByIdAtom,
@@ -19,7 +19,6 @@ import {
 } from "@/atoms/chatAtoms";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { useSelectChat } from "@/hooks/useSelectChat";
-import { useChats } from "@/hooks/useChats";
 
 export function ChatActivityButton() {
   const [open, setOpen] = useState(false);
@@ -61,18 +60,21 @@ export function ChatActivityButton() {
 }
 
 function ChatActivityList({ onSelect }: { onSelect?: () => void }) {
+  const { data: allChats = [], isLoading: loading } = useAllChats();
   const isStreamingById = useAtomValue(isStreamingByIdAtom);
   const recentStreamChatIds = useAtomValue(recentStreamChatIdsAtom);
   const apps = useLoadApps();
   const { selectChat } = useSelectChat();
-  const { chats: allChats, loading } = useChats(null);
 
-  const rows = useMemo(() => {
+  const chats = useMemo(() => {
     const recent = Array.from(recentStreamChatIds)
-      .map((id) => allChats.find((c: ChatSummary) => c.id === id))
-      .filter((c): c is ChatSummary => c !== undefined);
-    return [...recent].reverse().slice(0, 30);
-  }, [recentStreamChatIds, allChats]);
+      .map((id) => allChats.find((c) => c.id === id))
+      .filter((c) => c !== undefined);
+    // Sort recent first
+    return [...recent].reverse();
+  }, [allChats, recentStreamChatIds]);
+
+  const rows = useMemo(() => chats.slice(0, 30), [chats]);
 
   if (loading) {
     return (

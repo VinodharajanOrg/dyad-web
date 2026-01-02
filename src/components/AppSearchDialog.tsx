@@ -1,3 +1,4 @@
+"use client";
 import {
   CommandDialog,
   CommandInput,
@@ -8,13 +9,13 @@ import {
 } from "./ui/command";
 import { useState, useEffect } from "react";
 import { useSearchApps } from "@/hooks/useSearchApps";
-import type { AppSearchResult } from "@/lib/schemas";
+import type { App } from "@/api/endpoints/apps";
 
 type AppSearchDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectApp: (appId: number) => void;
-  allApps: AppSearchResult[];
+  allApps: App[];
 };
 
 export function AppSearchDialog({
@@ -37,7 +38,7 @@ export function AppSearchDialog({
   const { apps: searchResults } = useSearchApps(debouncedQuery);
 
   // Show all apps if search is empty, otherwise show search results
-  const appsToShow: AppSearchResult[] =
+  const appsToShow: App[] =
     debouncedQuery.trim() === "" ? allApps : searchResults;
 
   const commandFilter = (
@@ -116,32 +117,20 @@ export function AppSearchDialog({
         </CommandEmpty>
         <CommandGroup heading="Apps" data-testid="app-search-group">
           {appsToShow.map((app) => {
-            const isSearch = searchQuery.trim() !== "";
-            let snippet = null;
-            if (isSearch && app.matchedChatMessage) {
-              snippet = getSnippet(app.matchedChatMessage, searchQuery);
-            } else if (isSearch && app.matchedChatTitle) {
-              snippet = getSnippet(app.matchedChatTitle, searchQuery);
-            }
+            const snippet = getSnippet(app.path || "", searchQuery);
             return (
               <CommandItem
                 key={app.id}
                 onSelect={() => onSelectApp(app.id)}
                 value={app.name + (snippet ? ` ${snippet.raw}` : "")}
-                keywords={snippet ? [snippet.raw] : []}
+                keywords={snippet && snippet.raw ? [snippet.raw] : []}
                 data-testid={`app-search-item-${app.id}`}
               >
                 <div className="flex flex-col">
                   <span>{app.name}</span>
-                  {snippet && (
-                    <span className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {snippet.before}
-                      <mark className="bg-transparent underline decoration-2 decoration-primary">
-                        {snippet.match}
-                      </mark>
-                      {snippet.after}
-                    </span>
-                  )}
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {app.path}
+                  </span>
                 </div>
               </CommandItem>
             );

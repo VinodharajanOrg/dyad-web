@@ -1,4 +1,6 @@
-import { useNavigate } from "@tanstack/react-router";
+"use client";
+
+import { useRouter } from "next/navigation";
 import {
   ChevronRight,
   GiftIcon,
@@ -10,12 +12,12 @@ import {
   Settings,
   Folder,
 } from "lucide-react";
-import { providerSettingsRoute } from "@/routes/settings/providers/$provider";
 
 import SetupProviderCard from "@/components/SetupProviderCard";
 
 import { useState, useEffect, useCallback } from "react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import {
   Accordion,
   AccordionContent,
@@ -24,12 +26,10 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { NodeSystemInfo } from "@/ipc/ipc_types";
+import { NodeSystemInfo } from "@/types/ipc_types";
 import { usePostHog } from "posthog-js/react";
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useScrollAndNavigateTo } from "@/hooks/useScrollAndNavigateTo";
-// @ts-ignore
-import logo from "../../assets/logo.svg";
 import { OnboardingBanner } from "./home/OnboardingBanner";
 import { showError } from "@/lib/toast";
 import { useSettings } from "@/hooks/useSettings";
@@ -42,7 +42,7 @@ type NodeInstallStep =
 
 export function SetupBanner() {
   const posthog = usePostHog();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [isOnboardingVisible, setIsOnboardingVisible] = useState(true);
   const { isAnyProviderSetup, isLoading: loading } =
     useLanguageModelProviders();
@@ -55,7 +55,13 @@ export function SetupBanner() {
   const checkNode = useCallback(async () => {
     try {
       setNodeCheckError(false);
-      const status = await IpcClient.getInstance().getNodejsStatus();
+      const ipcClient = IpcClient.getInstance();
+      if (!ipcClient) {
+        // Web mode - assume Node.js is available (server is running)
+        setNodeSystemInfo({ isInstalled: true, version: "web-mode" } as any);
+        return;
+      }
+      const status = await (ipcClient as any).getNodejsStatus();
       setNodeSystemInfo(status);
     } catch (error) {
       console.error("Failed to check Node.js status:", error);
@@ -71,10 +77,16 @@ export function SetupBanner() {
   const handleManualNodeConfig = useCallback(async () => {
     setIsSelectingPath(true);
     try {
-      const result = await IpcClient.getInstance().selectNodeFolder();
+      const ipcClient = IpcClient.getInstance();
+      if (!ipcClient) {
+        // Web mode - skip manual config
+        setIsSelectingPath(false);
+        return;
+      }
+      const result = await (ipcClient as any).selectNodeFolder();
       if (result.path) {
         await updateSettings({ customNodePath: result.path });
-        await IpcClient.getInstance().reloadEnvPath();
+        await (ipcClient as any).reloadEnvPath();
         await checkNode();
         setNodeInstallStep("finished-checking");
         setShowManualConfig(false);
@@ -101,24 +113,25 @@ export function SetupBanner() {
 
   const handleGoogleSetupClick = () => {
     posthog.capture("setup-flow:ai-provider-setup:google:click");
-    navigate({
-      to: providerSettingsRoute.id,
-      params: { provider: "google" },
-    });
+    router.push("/settings");
   };
 
   const handleOpenRouterSetupClick = () => {
     posthog.capture("setup-flow:ai-provider-setup:openrouter:click");
-    navigate({
-      to: providerSettingsRoute.id,
-      params: { provider: "openrouter" },
-    });
+    router.push("/settings");
   };
   const handleDyadProSetupClick = () => {
     posthog.capture("setup-flow:ai-provider-setup:dyad:click");
-    IpcClient.getInstance().openExternalUrl(
-      "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=setup-banner",
-    );
+    const ipcClient = IpcClient.getInstance();
+    if (ipcClient) {
+      (ipcClient as any).openExternalUrl(
+        "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=setup-banner",
+      );
+    } else {
+      openExternalUrl(
+        "https://www.dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=setup-banner",
+      );
+    }
   };
 
   const handleOtherProvidersClick = () => {
@@ -129,13 +142,21 @@ export function SetupBanner() {
   const handleNodeInstallClick = useCallback(async () => {
     posthog.capture("setup-flow:start-node-install-click");
     setNodeInstallStep("waiting-for-continue");
-    IpcClient.getInstance().openExternalUrl(nodeSystemInfo!.nodeDownloadUrl);
+    const ipcClient = IpcClient.getInstance();
+    if (ipcClient) {
+      (ipcClient as any).openExternalUrl(nodeSystemInfo!.nodeDownloadUrl);
+    } else {
+      openExternalUrl(nodeSystemInfo!.nodeDownloadUrl);
+    }
   }, [nodeSystemInfo, setNodeInstallStep]);
 
   const finishNodeInstall = useCallback(async () => {
     posthog.capture("setup-flow:continue-node-install-click");
     setNodeInstallStep("continue-processing");
-    await IpcClient.getInstance().reloadEnvPath();
+    const ipcClient = IpcClient.getInstance();
+    if (ipcClient) {
+      await (ipcClient as any).reloadEnvPath();
+    }
     await checkNode();
     setNodeInstallStep("finished-checking");
   }, [checkNode, setNodeInstallStep]);
@@ -236,9 +257,14 @@ export function SetupBanner() {
                       <a
                         className="text-blue-500 dark:text-blue-400 hover:underline"
                         onClick={() => {
-                          IpcClient.getInstance().openExternalUrl(
-                            "https://nodejs.org/en/download",
-                          );
+                          const ipcClient = IpcClient.getInstance();
+                          if (ipcClient) {
+                            (ipcClient as any).openExternalUrl(
+                              "https://nodejs.org/en/download",
+                            );
+                          } else {
+                            openExternalUrl("https://nodejs.org/en/download");
+                          }
                         }}
                       >
                         more download options
@@ -347,7 +373,12 @@ export function SetupBanner() {
                 onClick={handleDyadProSetupClick}
                 tabIndex={isNodeSetupComplete ? 0 : -1}
                 leadingIcon={
-                  <img src={logo} alt="Dyad Logo" className="w-6 h-6 mr-0.5" />
+                  <img
+                    src="/logo.svg"
+                    alt="Dyad Logo"
+                    className="w-6 h-6 mr-0.5"
+                    style={{ width: "24px", height: "24px" }}
+                  />
                 }
                 title="Setup Dyad Pro"
                 subtitle="Access all AI models with one plan"
@@ -392,9 +423,14 @@ function NodeJsHelpCallout() {
         If you run into issues, read our{" "}
         <a
           onClick={() => {
-            IpcClient.getInstance().openExternalUrl(
-              "https://www.dyad.sh/docs/help/nodejs",
-            );
+            const ipcClient = IpcClient.getInstance();
+            if (ipcClient) {
+              (ipcClient as any).openExternalUrl(
+                "https://www.dyad.sh/docs/help/nodejs",
+              );
+            } else {
+              openExternalUrl("https://www.dyad.sh/docs/help/nodejs");
+            }
           }}
           className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
@@ -460,17 +496,14 @@ export const OpenRouterSetupBanner = ({
   className?: string;
 }) => {
   const posthog = usePostHog();
-  const navigate = useNavigate();
+  const router = useRouter();
   return (
     <SetupProviderCard
       className={cn("mt-2", className)}
       variant="openrouter"
       onClick={() => {
         posthog.capture("setup-flow:ai-provider-setup:openrouter:click");
-        navigate({
-          to: providerSettingsRoute.id,
-          params: { provider: "openrouter" },
-        });
+        router.push("/settings");
       }}
       tabIndex={0}
       leadingIcon={

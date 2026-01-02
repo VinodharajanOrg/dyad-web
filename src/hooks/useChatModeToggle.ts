@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from "react";
-import { useSettings } from "./useSettings";
+import { useAtom } from "jotai";
+import { selectedChatModeAtom } from "@/atoms/chatAtoms";
 import { useShortcut } from "./useShortcut";
 import { usePostHog } from "posthog-js/react";
 import { ChatModeSchema } from "../lib/schemas";
 
 export function useChatModeToggle() {
-  const { settings, updateSettings } = useSettings();
+  const [selectedChatMode, setSelectedChatMode] = useAtom(selectedChatModeAtom);
   const posthog = usePostHog();
 
   // Detect if user is on mac
@@ -22,20 +23,19 @@ export function useChatModeToggle() {
 
   // Function to toggle between ask and build chat modes
   const toggleChatMode = useCallback(() => {
-    if (!settings || !settings.selectedChatMode) return;
+    if (!selectedChatMode) return;
 
-    const currentMode = settings.selectedChatMode;
     const modes = ChatModeSchema.options;
-    const currentIndex = modes.indexOf(settings.selectedChatMode);
+    const currentIndex = modes.indexOf(selectedChatMode);
     const newMode = modes[(currentIndex + 1) % modes.length];
 
-    updateSettings({ selectedChatMode: newMode });
+    setSelectedChatMode(newMode);
     posthog.capture("chat:mode_toggle", {
-      from: currentMode,
+      from: selectedChatMode,
       to: newMode,
       trigger: "keyboard_shortcut",
     });
-  }, [settings, updateSettings, posthog]);
+  }, [selectedChatMode, setSelectedChatMode, posthog]);
 
   // Add keyboard shortcut with memoized modifiers
   useShortcut(

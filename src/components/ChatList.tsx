@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 import { formatDistanceToNow } from "date-fns";
 import { PlusCircle, MoreVertical, Trash2, Edit3, Search } from "lucide-react";
@@ -7,7 +9,6 @@ import { useAtom } from "jotai";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { dropdownOpenAtom } from "@/atoms/uiAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
 import { showError, showSuccess } from "@/lib/toast";
 import {
   SidebarGroup,
@@ -23,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useChats } from "@/hooks/useChats";
+import { useChats, useCreateChat, useDeleteChat } from "@/hooks/useChats";
 import { RenameChatDialog } from "@/components/chat/RenameChatDialog";
 import { DeleteChatDialog } from "@/components/chat/DeleteChatDialog";
 
@@ -31,14 +32,24 @@ import { ChatSearchDialog } from "./ChatSearchDialog";
 import { useSelectChat } from "@/hooks/useSelectChat";
 
 export function ChatList({ show }: { show?: boolean }) {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedChatId, setSelectedChatId] = useAtom(selectedChatIdAtom);
   const [selectedAppId] = useAtom(selectedAppIdAtom);
   const [, setIsDropdownOpen] = useAtom(dropdownOpenAtom);
 
-  const { chats, loading, invalidateChats } = useChats(selectedAppId);
-  const routerState = useRouterState();
-  const isChatRoute = routerState.location.pathname === "/chat";
+  // TanStack Query returns { data, isLoading, refetch } instead of { chats, loading, refreshChats }
+  const {
+    data: chatsData,
+    isLoading: loading,
+    refetch: refreshChats,
+  } = useChats(selectedAppId ?? undefined);
+  
+  // Ensure chats is always an array
+  const chats = Array.isArray(chatsData) ? chatsData : [];
+  
+  const pathname = usePathname();
+  const isChatRoute = pathname === "/chat";
 
   // Rename dialog state
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
@@ -54,19 +65,22 @@ export function ChatList({ show }: { show?: boolean }) {
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const { selectChat } = useSelectChat();
 
+  // All hooks must be called before any conditional returns (Rules of Hooks)
+  const createChatMutation = useCreateChat();
+  const deleteChatMutation = useDeleteChat();
+
   // Update selectedChatId when route changes
   useEffect(() => {
     if (isChatRoute) {
-      const id = routerState.location.search.id;
+      const id = searchParams.get("id");
       if (id) {
-        console.log("Setting selected chat id to", id);
-        setSelectedChatId(id);
+        setSelectedChatId(Number(id));
       }
     }
-  }, [isChatRoute, routerState.location.search, setSelectedChatId]);
+  }, [isChatRoute, searchParams, setSelectedChatId]);
 
   if (!show) {
-    return;
+    return null;
   }
 
   const handleChatClick = ({
@@ -84,41 +98,39 @@ export function ChatList({ show }: { show?: boolean }) {
     // Only create a new chat if an app is selected
     if (selectedAppId) {
       try {
-        // Create a new chat with an empty title for now
-        const chatId = await IpcClient.getInstance().createChat(selectedAppId);
-
-        // Navigate to the new chat
-        setSelectedChatId(chatId);
-        navigate({
-          to: "/chat",
-          search: { id: chatId },
+        const newChat = await createChatMutation.mutateAsync({
+          appId: selectedAppId,
         });
 
+        // Navigate to the new chat
+        setSelectedChatId(newChat.id);
+        router.push(`/${selectedAppId}/chat?id=${newChat.id}`);
+
         // Refresh the chat list
-        await invalidateChats();
+        await refreshChats();
       } catch (error) {
         // DO A TOAST
         showError(`Failed to create new chat: ${(error as any).toString()}`);
       }
     } else {
       // If no app is selected, navigate to home page
-      navigate({ to: "/" });
+      router.push("/");
     }
   };
 
   const handleDeleteChat = async (chatId: number) => {
     try {
-      await IpcClient.getInstance().deleteChat(chatId);
+      await deleteChatMutation.mutateAsync(chatId);
       showSuccess("Chat deleted successfully");
 
       // If the deleted chat was selected, navigate to home
       if (selectedChatId === chatId) {
         setSelectedChatId(null);
-        navigate({ to: "/chat" });
+        router.push(`/${selectedAppId}/chat`);
       }
 
       // Refresh the chat list
-      await invalidateChats();
+      await refreshChats();
     } catch (error) {
       showError(`Failed to delete chat: ${(error as any).toString()}`);
     }
@@ -184,13 +196,13 @@ export function ChatList({ show }: { show?: boolean }) {
               <div className="py-3 px-4 text-sm text-gray-500">
                 Loading chats...
               </div>
-            ) : chats.length === 0 ? (
+            ) : !chats || chats.length === 0 ? (
               <div className="py-3 px-4 text-sm text-gray-500">
                 No chats found
               </div>
             ) : (
               <SidebarMenu className="space-y-1">
-                {chats.map((chat) => (
+                {(chats || []).map((chat) => (
                   <SidebarMenuItem key={chat.id} className="mb-1">
                     <div className="flex w-[175px] items-center">
                       <Button
@@ -278,7 +290,7 @@ export function ChatList({ show }: { show?: boolean }) {
           currentTitle={renameChatTitle}
           isOpen={isRenameDialogOpen}
           onOpenChange={handleRenameDialogClose}
-          onRename={invalidateChats}
+          onRename={refreshChats}
         />
       )}
 
@@ -295,7 +307,6 @@ export function ChatList({ show }: { show?: boolean }) {
         open={isSearchDialogOpen}
         onOpenChange={setIsSearchDialogOpen}
         onSelectChat={handleChatClick}
-        appId={selectedAppId}
         allChats={chats}
       />
     </>

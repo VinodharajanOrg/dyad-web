@@ -1,3 +1,4 @@
+"use client";
 import { isDyadProEnabled, type LargeLanguageModel } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,23 +22,28 @@ import { useLocalModels } from "@/hooks/useLocalModels";
 import { useLocalLMSModels } from "@/hooks/useLMStudioModels";
 import { useLanguageModelsByProviders } from "@/hooks/useLanguageModelsByProviders";
 
-import { LocalModel } from "@/ipc/ipc_types";
+import { LocalModel } from "@/types/ipc_types";
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useSettings } from "@/hooks/useSettings";
+import { useAtom } from "jotai";
+import { selectedModelAtom } from "@/atoms/chatAtoms";
 import { PriceBadge } from "@/components/PriceBadge";
-import { TURBO_MODELS } from "@/ipc/shared/language_model_constants";
+import { TURBO_MODELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
-import { TOKEN_COUNT_QUERY_KEY } from "@/hooks/useCountTokens";
 
 export function ModelPicker() {
-  const { settings, updateSettings } = useSettings();
-  const queryClient = useQueryClient();
+  const { settings } = useSettings();
+  const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom);
+
+  // Initialize selectedModel from settings on mount if not already set
+  useEffect(() => {
+    if (!selectedModel && settings?.selectedModel) {
+      setSelectedModel(settings.selectedModel);
+    }
+  }, []);
+
   const onModelSelect = (model: LargeLanguageModel) => {
-    updateSettings({ selectedModel: model });
-    // Invalidate token count when model changes since different models have different context windows
-    // (technically they have different tokenizers, but we don't keep track of that).
-    queryClient.invalidateQueries({ queryKey: TOKEN_COUNT_QUERY_KEY });
+    setSelectedModel(model);
   };
 
   const [open, setOpen] = useState(false);
@@ -76,6 +82,15 @@ export function ModelPicker() {
 
   // Get display name for the selected model
   const getModelDisplayName = () => {
+    if (!selectedModel) {
+      return "Select a model";
+    }
+    
+    // Validate that selectedModel.name is not empty or invalid
+    if (!selectedModel.name || selectedModel.name === "string" || typeof selectedModel.name !== "string" || selectedModel.name.trim() === "") {
+      return "Select a model";
+    }
+    
     if (selectedModel.provider === "ollama") {
       return (
         ollamaModels.find(
@@ -109,7 +124,7 @@ export function ModelPicker() {
     }
 
     // Fallback if not found
-    return selectedModel.name;
+    return selectedModel.name || "Select a model";
   };
 
   // Get auto provider models (if any)
@@ -143,7 +158,6 @@ export function ModelPicker() {
   if (!settings) {
     return null;
   }
-  const selectedModel = settings?.selectedModel;
   const modelDisplayName = getModelDisplayName();
   // Split providers into primary and secondary groups (excluding auto)
   const providerEntries =
@@ -154,16 +168,18 @@ export function ModelPicker() {
       : [];
   const primaryProviders = providerEntries.filter(([providerId, models]) => {
     if (models.length === 0) return false;
-    const provider = providers?.find((p) => p.id === providerId);
-    return !(provider && provider.secondary);
+    const providerIdNum = parseInt(providerId, 10);
+    const provider = providers?.find((p) => p.id === providerIdNum);
+    return !(provider && (provider as any).secondary);
   });
   if (settings && isDyadProEnabled(settings)) {
-    primaryProviders.unshift(["auto", TURBO_MODELS]);
+    primaryProviders.unshift(["auto", TURBO_MODELS as any]);
   }
   const secondaryProviders = providerEntries.filter(([providerId, models]) => {
     if (models.length === 0) return false;
-    const provider = providers?.find((p) => p.id === providerId);
-    return !!(provider && provider.secondary);
+    const providerIdNum = parseInt(providerId, 10);
+    const provider = providers?.find((p) => p.id === providerIdNum);
+    return !!((provider as any) && (provider as any).secondary);
   });
 
   return (
@@ -220,8 +236,8 @@ export function ModelPicker() {
                     <TooltipTrigger asChild>
                       <DropdownMenuItem
                         className={
-                          selectedModel.provider === "auto" &&
-                          selectedModel.name === model.apiName
+                          selectedModel?.provider === "auto" &&
+                          selectedModel?.name === model.apiName
                             ? "bg-secondary"
                             : ""
                         }
@@ -277,9 +293,10 @@ export function ModelPicker() {
                 }
                 return true;
               });
-              const provider = providers?.find((p) => p.id === providerId);
+              const providerIdNum = parseInt(providerId, 10);
+              const provider = providers?.find((p) => p.id === providerIdNum);
               const providerDisplayName =
-                provider?.id === "auto"
+                providerId === "auto"
                   ? "Dyad Turbo"
                   : (provider?.name ?? providerId);
               return (
@@ -288,8 +305,8 @@ export function ModelPicker() {
                     <div className="flex flex-col items-start w-full">
                       <div className="flex items-center gap-2">
                         <span>{providerDisplayName}</span>
-                        {provider?.type === "cloud" &&
-                          !provider?.secondary &&
+                        {(provider as any)?.type === "cloud" &&
+                          !(provider as any)?.secondary &&
                           isDyadProEnabled(settings) && (
                             <span className="text-[10px] bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 bg-[length:200%_100%] animate-[shimmer_5s_ease-in-out_infinite] text-white px-1.5 py-0.5 rounded-full font-medium">
                               Pro
@@ -316,8 +333,8 @@ export function ModelPicker() {
                         <TooltipTrigger asChild>
                           <DropdownMenuItem
                             className={
-                              selectedModel.provider === providerId &&
-                              selectedModel.name === model.apiName
+                              selectedModel?.provider === providerId &&
+                              selectedModel?.name === model.apiName
                                 ? "bg-secondary"
                                 : ""
                             }
@@ -368,8 +385,9 @@ export function ModelPicker() {
                   <DropdownMenuLabel>Other AI providers</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {secondaryProviders.map(([providerId, models]) => {
+                    const providerIdNum = parseInt(providerId, 10);
                     const provider = providers?.find(
-                      (p) => p.id === providerId,
+                      (p) => p.id === providerIdNum,
                     );
                     return (
                       <DropdownMenuSub key={providerId}>
@@ -377,7 +395,7 @@ export function ModelPicker() {
                           <div className="flex flex-col items-start w-full">
                             <div className="flex items-center gap-2">
                               <span>{provider?.name ?? providerId}</span>
-                              {provider?.type === "custom" && (
+                              {(provider as any)?.type === "custom" && (
                                 <span className="text-[10px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
                                   Custom
                                 </span>
@@ -398,8 +416,8 @@ export function ModelPicker() {
                               <TooltipTrigger asChild>
                                 <DropdownMenuItem
                                   className={
-                                    selectedModel.provider === providerId &&
-                                    selectedModel.name === model.apiName
+                                    selectedModel?.provider === providerId &&
+                                    selectedModel?.name === model.apiName
                                       ? "bg-secondary"
                                       : ""
                                   }
@@ -509,8 +527,8 @@ export function ModelPicker() {
                     <DropdownMenuItem
                       key={`ollama-${model.modelName}`}
                       className={
-                        selectedModel.provider === "ollama" &&
-                        selectedModel.name === model.modelName
+                        selectedModel?.provider === "ollama" &&
+                        selectedModel?.name === model.modelName
                           ? "bg-secondary"
                           : ""
                       }
@@ -590,8 +608,8 @@ export function ModelPicker() {
                     <DropdownMenuItem
                       key={`lmstudio-${model.modelName}`}
                       className={
-                        selectedModel.provider === "lmstudio" &&
-                        selectedModel.name === model.modelName
+                        selectedModel?.provider === "lmstudio" &&
+                        selectedModel?.name === model.modelName
                           ? "bg-secondary"
                           : ""
                       }

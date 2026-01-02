@@ -22,47 +22,42 @@ Add these commands to your `package.json`:
 
 ## Mocking Guidelines
 
-### Mocking fs module
+### Mocking API Clients
 
-When mocking the `node:fs` module, use a default export in the mock:
+When testing components that use API calls, mock the API client:
 
 ```typescript
-vi.mock("node:fs", async () => {
-  return {
-    default: {
-      mkdirSync: vi.fn(),
-      writeFileSync: vi.fn(),
-      // Add other fs methods as needed
-    },
-  };
+import { apiClient } from '@/api/client';
+
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+```
+
+### Mocking React Query
+
+When testing hooks that use React Query, provide a QueryClient wrapper:
+
+```typescript
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: { retry: false },
+  },
 });
-```
 
-### Mocking isomorphic-git
-
-When mocking isomorphic-git, provide a default export:
-
-```typescript
-vi.mock("isomorphic-git", () => ({
-  default: {
-    add: vi.fn().mockResolvedValue(undefined),
-    commit: vi.fn().mockResolvedValue(undefined),
-    // Add other git methods as needed
-  },
-}));
-```
-
-### Testing IPC Handlers
-
-When testing IPC handlers, mock the Electron IPC system:
-
-```typescript
-vi.mock("electron", () => ({
-  ipcMain: {
-    handle: vi.fn(),
-    on: vi.fn(),
-  },
-}));
+const wrapper = ({ children }) => (
+  <QueryClientProvider client={queryClient}>
+    {children}
+  </QueryClientProvider>
+);
 ```
 
 ## Adding New Tests
@@ -72,6 +67,8 @@ vi.mock("electron", () => ({
 3. Mock any dependencies using `vi.mock()`
 4. Write your test cases using `describe()` and `it()`
 
-## Example
+## Example Tests
 
-See `chat_stream_handlers.test.ts` for an example of testing IPC handlers with proper mocking.
+- `parseOllamaHost.test.ts` - Testing utility functions
+- `path_utils.test.ts` - Testing path manipulation utilities
+- See `src/api/__tests__/` for API endpoint testing examples

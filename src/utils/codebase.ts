@@ -1,14 +1,17 @@
+import fs from "node:fs";
 import fsAsync from "node:fs/promises";
 import path from "node:path";
-import { gitIsIgnored } from "../ipc/utils/git_utils";
-import log from "electron-log";
-import { IS_TEST_BUILD } from "../ipc/utils/test_utils";
+import { isIgnored } from "isomorphic-git";
 import { glob } from "glob";
 import { AppChatContext } from "../lib/schemas";
-import { readSettings } from "@/main/settings";
 import { AsyncVirtualFileSystem } from "../../shared/VirtualFilesystem";
 
-const logger = log.scope("utils/codebase");
+const logger = {
+  log: (...args: any[]) => console.log("[codebase]", ...args),
+  info: (...args: any[]) => console.log("[codebase]", ...args),
+  warn: (...args: any[]) => console.warn("[codebase]", ...args),
+  error: (...args: any[]) => console.error("[codebase]", ...args),
+};
 
 // File extensions to include in the extraction
 const ALLOWED_EXTENSIONS = [
@@ -175,8 +178,9 @@ async function isGitIgnored(
     }
 
     const relativePath = path.relative(baseDir, filePath);
-    const result = await gitIsIgnored({
-      path: baseDir,
+    const result = await isIgnored({
+      fs,
+      dir: baseDir,
       filepath: relativePath,
     });
 
@@ -441,9 +445,8 @@ export async function extractCodebase({
   formattedOutput: string;
   files: CodebaseFile[];
 }> {
-  const settings = readSettings();
-  const isSmartContextEnabled =
-    settings?.enableDyadPro && settings?.enableProSmartFilesContextMode;
+  // Smart context is always disabled in web version (Dyad Pro feature removed)
+  const isSmartContextEnabled = false;
 
   try {
     await fsAsync.access(appPath);
@@ -608,13 +611,13 @@ export async function extractCodebase({
 
   const endTime = Date.now();
   logger.log("extractCodebase: time taken", endTime - startTime);
-  if (IS_TEST_BUILD) {
-    // Why? For some reason, file ordering is not stable on Windows.
-    // This is a workaround to ensure stable ordering, although
-    // ideally we'd like to sort it by modification time which is
-    // important for cache-ability.
-    filesArray.sort((a, b) => a.path.localeCompare(b.path));
-  }
+
+  // Always sort for stable ordering across platforms
+  // For some reason, file ordering is not stable on Windows.
+  // This is a workaround to ensure stable ordering, although
+  // ideally we'd like to sort it by modification time which is
+  // important for cache-ability.
+  filesArray.sort((a, b) => a.path.localeCompare(b.path));
   return {
     formattedOutput,
     files: filesArray,
@@ -640,17 +643,14 @@ async function sortFilesByModificationTime(files: string[]): Promise<string[]> {
     }),
   );
 
-  if (IS_TEST_BUILD) {
-    // Why? For some reason, file ordering is not stable on Windows.
-    // This is a workaround to ensure stable ordering, although
-    // ideally we'd like to sort it by modification time which is
-    // important for cache-ability.
-    return fileStats
-      .sort((a, b) => a.file.localeCompare(b.file))
-      .map((item) => item.file);
-  }
-  // Sort by modification time (oldest first)
-  return fileStats.sort((a, b) => a.mtime - b.mtime).map((item) => item.file);
+  // Always sort for stable ordering across platforms
+  // For some reason, file ordering is not stable on Windows.
+  // This is a workaround to ensure stable ordering, although
+  // ideally we'd like to sort it by modification time which is
+  // important for cache-ability.
+  return fileStats
+    .sort((a, b) => a.file.localeCompare(b.file))
+    .map((item) => item.file);
 }
 
 function createFullGlobPath({

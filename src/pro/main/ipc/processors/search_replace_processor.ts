@@ -3,9 +3,6 @@
 import { parseSearchReplaceBlocks } from "@/pro/shared/search_replace_parser";
 import { distance } from "fastest-levenshtein";
 import { normalizeString } from "@/utils/text_normalization";
-import log from "electron-log";
-
-const logger = log.scope("search_replace_processor");
 
 // Minimum similarity threshold for fuzzy matching (0 to 1, where 1 is exact match)
 const FUZZY_MATCH_THRESHOLD = 0.9;
@@ -204,9 +201,12 @@ export function applySearchReplace(
       };
     }
 
-    // If search and replace are identical, it's a no-op and is just treated as a warning
+    // If search and replace are identical, it's a no-op and should be treated as an error
     if (searchLines.join("\n") === replaceLines.join("\n")) {
-      logger.warn("Search and replace blocks are identical");
+      return {
+        success: false,
+        error: "Search and replace blocks are identical",
+      };
     }
 
     let matchIndex = -1;

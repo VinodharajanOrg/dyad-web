@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Home,
   Inbox,
@@ -5,12 +7,15 @@ import {
   HelpCircle,
   Store,
   BookOpen,
+  LogOut,
 } from "lucide-react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSidebar } from "@/components/ui/sidebar"; // import useSidebar hook
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useAtom } from "jotai";
 import { dropdownOpenAtom } from "@/atoms/uiAtoms";
+import { authApi } from "@/api/endpoints/auth";
 
 import {
   Sidebar,
@@ -91,12 +96,12 @@ export function AppSidebar() {
     }
   }, [hoverState, toggleSidebar, state, setHoverState, isDropdownOpen]);
 
-  const routerState = useRouterState();
-  const isAppRoute =
-    routerState.location.pathname === "/" ||
-    routerState.location.pathname.startsWith("/app-details");
-  const isChatRoute = routerState.location.pathname === "/chat";
-  const isSettingsRoute = routerState.location.pathname.startsWith("/settings");
+  const pathname = usePathname();
+  const isAppRoute = pathname === "/" || pathname.startsWith("/app-details");
+  const isChatRoute = pathname.startsWith("/") && pathname.includes("/chat");
+  const isSettingsRoute = pathname.startsWith("/settings");
+  const isLibraryRoute = pathname === "/library";
+  const isHubRoute = pathname === "/hub";
 
   let selectedItem: string | null = null;
   if (hoverState === "start-hover:app") {
@@ -114,6 +119,10 @@ export function AppSidebar() {
       selectedItem = "Chat";
     } else if (isSettingsRoute) {
       selectedItem = "Settings";
+    } else if (isLibraryRoute) {
+      selectedItem = "Library";
+    } else if (isHubRoute) {
+      selectedItem = "Hub";
     }
   }
 
@@ -140,7 +149,9 @@ export function AppSidebar() {
           {/* Right Column: Chat List Section */}
           <div className="w-[240px]">
             <AppList show={selectedItem === "Apps"} />
-            <ChatList show={selectedItem === "Chat"} />
+            <Suspense fallback={<div className="p-2">Loading chats...</div>}>
+              <ChatList show={selectedItem === "Chat"} />
+            </Suspense>
             <SettingsList show={selectedItem === "Settings"} />
           </div>
         </div>
@@ -149,11 +160,11 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Change button to open dialog instead of linking */}
+            {/* Help button */}
             <SidebarMenuButton
               size="sm"
               className="font-medium w-14 flex flex-col items-center gap-1 h-14 mb-2 rounded-2xl"
-              onClick={() => setIsHelpDialogOpen(true)} // Open dialog on click
+              onClick={() => setIsHelpDialogOpen(true)}
             >
               <HelpCircle className="h-5 w-5" />
               <span className={"text-xs"}>Help</span>
@@ -163,9 +174,18 @@ export function AppSidebar() {
               onClose={() => setIsHelpDialogOpen(false)}
             />
           </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="sm"
+              className="font-medium w-14 flex flex-col items-center gap-1 h-14 mb-2 rounded-2xl"
+              onClick={() => authApi.logout()}
+            >
+              <LogOut className="h-5 w-5" />
+              <span className={"text-xs"}>Logout</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
       <SidebarRail />
     </Sidebar>
   );
@@ -176,8 +196,7 @@ function AppIcons({
 }: {
   onHoverChange: (state: HoverState) => void;
 }) {
-  const routerState = useRouterState();
-  const pathname = routerState.location.pathname;
+  const pathname = usePathname();
 
   return (
     // When collapsed: only show the main menu
@@ -199,7 +218,7 @@ function AppIcons({
                   className="font-medium w-14"
                 >
                   <Link
-                    to={item.to}
+                    href={item.to}
                     className={`flex flex-col items-center gap-1 h-14 mb-2 rounded-2xl ${
                       isActive ? "bg-sidebar-accent" : ""
                     }`}

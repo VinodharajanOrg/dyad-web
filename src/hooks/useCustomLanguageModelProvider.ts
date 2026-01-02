@@ -1,22 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
-import type {
-  CreateCustomLanguageModelProviderParams,
-  LanguageModelProvider,
-} from "@/ipc/ipc_types";
-import { showError } from "@/lib/toast";
+import { languageModelProvidersApi } from "@/api/endpoints";
+// import { IpcClient } from "@/api/ipc_client";
+import type { CreateProviderParams } from "@/api/endpoints/language-model-providers";
+import { showError, showSuccess } from "@/lib/toast";
 
 export function useCustomLanguageModelProvider() {
   const queryClient = useQueryClient();
-  const ipcClient = IpcClient.getInstance();
+  //const ipcClient = IpcClient.getInstance();
 
   const createProviderMutation = useMutation({
-    mutationFn: async (
-      params: CreateCustomLanguageModelProviderParams,
-    ): Promise<LanguageModelProvider> => {
-      if (!params.id.trim()) {
-        throw new Error("Provider ID is required");
-      }
+    mutationFn: async (params: CreateProviderParams) => {
       if (!params.name.trim()) {
         throw new Error("Provider name is required");
       }
@@ -24,14 +17,14 @@ export function useCustomLanguageModelProvider() {
         throw new Error("API base URL is required");
       }
 
-      return ipcClient.createCustomLanguageModelProvider({
-        id: params.id.trim(),
+      return languageModelProvidersApi.create({
         name: params.name.trim(),
         apiBaseUrl: params.apiBaseUrl.trim(),
         envVarName: params.envVarName?.trim() || undefined,
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      showSuccess(data.message || "Provider created successfully");
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ["languageModelProviders"] });
     },
@@ -42,11 +35,8 @@ export function useCustomLanguageModelProvider() {
 
   const editProviderMutation = useMutation({
     mutationFn: async (
-      params: CreateCustomLanguageModelProviderParams,
-    ): Promise<LanguageModelProvider> => {
-      if (!params.id.trim()) {
-        throw new Error("Provider ID is required");
-      }
+      params: CreateProviderParams & { providerId: number },
+    ) => {
       if (!params.name.trim()) {
         throw new Error("Provider name is required");
       }
@@ -54,14 +44,19 @@ export function useCustomLanguageModelProvider() {
         throw new Error("API base URL is required");
       }
 
-      return ipcClient.editCustomLanguageModelProvider({
-        id: params.id.trim(),
-        name: params.name.trim(),
-        apiBaseUrl: params.apiBaseUrl.trim(),
-        envVarName: params.envVarName?.trim() || undefined,
-      });
+      const response = await languageModelProvidersApi.update(
+        params.providerId,
+        {
+          name: params.name.trim(),
+          apiBaseUrl: params.apiBaseUrl.trim(),
+          envVarName: params.envVarName?.trim() || undefined,
+        },
+      );
+
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      showSuccess(data.message || "Provider updated successfully");
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ["languageModelProviders"] });
     },
@@ -76,26 +71,30 @@ export function useCustomLanguageModelProvider() {
         throw new Error("Provider ID is required");
       }
 
-      return ipcClient.deleteCustomLanguageModelProvider(providerId);
+      await languageModelProvidersApi.delete(providerId);
     },
-    onSuccess: () => {
-      // Invalidate and refetch
+    //onSuccess: (_, __, _context) => {
+    onSuccess: (_, __) => {
+      showSuccess("Provider deleted successfully");
+      // Invalidate providers list
       queryClient.invalidateQueries({ queryKey: ["languageModelProviders"] });
+      // Invalidate ModelPicker's language-models-by-providers cache
+      queryClient.invalidateQueries({
+        queryKey: ["language-models-by-providers"],
+      });
     },
     onError: (error) => {
       showError(error);
     },
   });
 
-  const createProvider = async (
-    params: CreateCustomLanguageModelProviderParams,
-  ): Promise<LanguageModelProvider> => {
+  const createProvider = async (params: CreateProviderParams) => {
     return createProviderMutation.mutateAsync(params);
   };
 
   const editProvider = async (
-    params: CreateCustomLanguageModelProviderParams,
-  ): Promise<LanguageModelProvider> => {
+    params: CreateProviderParams & { providerId: number },
+  ) => {
     return editProviderMutation.mutateAsync(params);
   };
 

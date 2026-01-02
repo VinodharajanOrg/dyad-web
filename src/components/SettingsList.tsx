@@ -1,48 +1,42 @@
+"use client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo } from "react";
 import { useScrollAndNavigateTo } from "@/hooks/useScrollAndNavigateTo";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { activeSettingsSectionAtom } from "@/atoms/viewAtoms";
-import { useSettings } from "@/hooks/useSettings";
-import type { UserSettings } from "@/lib/schemas";
+import { isAdminAtom } from "@/atoms/userAtoms";
 
-type SettingsSection = {
-  id: string;
-  label: string;
-  isEnabled?: (settings: UserSettings | null) => boolean;
-};
-
-const SETTINGS_SECTIONS: SettingsSection[] = [
-  { id: "general-settings", label: "General" },
-  { id: "workflow-settings", label: "Workflow" },
-  { id: "ai-settings", label: "AI" },
-  { id: "provider-settings", label: "Model Providers" },
-  { id: "telemetry", label: "Telemetry" },
-  { id: "integrations", label: "Integrations" },
-  {
-    id: "agent-permissions",
-    label: "Agent Permissions",
-    isEnabled: (settings) => !!settings?.experiments?.enableLocalAgent,
-  },
-  { id: "tools-mcp", label: "Tools (MCP)" },
-  { id: "experiments", label: "Experiments" },
-  { id: "danger-zone", label: "Danger Zone" },
-];
+// NOTE: All available settings sections
+const ALL_SETTINGS_SECTIONS = [
+  { id: "general-settings", label: "General", visibleTo: "all" },
+  { id: "ai-settings", label: "AI", visibleTo: "admin" },
+  { id: "provider-settings", label: "Model Providers", visibleTo: "admin" },
+  // NOTE: Commented out sections - uncomment when needed
+  // { id: "workflow-settings", label: "Workflow", visibleTo: "all" },
+  // { id: "telemetry", label: "Telemetry", visibleTo: "all" },
+  // { id: "integrations", label: "Integrations", visibleTo: "all" },
+  // { id: "tools-mcp", label: "Tools (MCP)", visibleTo: "all" },
+  // { id: "experiments", label: "Experiments", visibleTo: "all" },
+  // { id: "danger-zone", label: "Danger Zone", visibleTo: "admin" },
+] as const;
 
 export function SettingsList({ show }: { show: boolean }) {
   const [activeSection, setActiveSection] = useAtom(activeSettingsSectionAtom);
-  const { settings } = useSettings();
   const scrollAndNavigateTo = useScrollAndNavigateTo("/settings", {
     behavior: "smooth",
     block: "start",
   });
 
-  const settingsSections = useMemo(() => {
-    return SETTINGS_SECTIONS.filter(
-      (section) => !section.isEnabled || section.isEnabled(settings ?? null),
-    );
-  }, [settings]);
+  const isAdmin = useAtomValue(isAdminAtom);
+  // Filter sections based on user role
+  const SETTINGS_SECTIONS = useMemo(() => {
+    return ALL_SETTINGS_SECTIONS.filter((section) => {
+      if (section.visibleTo === "all") return true;
+      if (section.visibleTo === "admin") return isAdmin;
+      return false;
+    });
+  }, [isAdmin]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -57,7 +51,7 @@ export function SettingsList({ show }: { show: boolean }) {
       { rootMargin: "-20% 0px -80% 0px", threshold: 0 },
     );
 
-    for (const section of settingsSections) {
+    for (const section of SETTINGS_SECTIONS) {
       const el = document.getElementById(section.id);
       if (el) {
         observer.observe(el);
@@ -67,7 +61,7 @@ export function SettingsList({ show }: { show: boolean }) {
     return () => {
       observer.disconnect();
     };
-  }, [settingsSections, setActiveSection]);
+  }, []);
 
   if (!show) {
     return null;
@@ -82,7 +76,7 @@ export function SettingsList({ show }: { show: boolean }) {
       </div>
       <ScrollArea className="flex-grow">
         <div className="space-y-1 p-4 pt-0">
-          {settingsSections.map((section) => (
+          {SETTINGS_SECTIONS.map((section) => (
             <button
               key={section.id}
               onClick={() => handleScrollAndNavigateTo(section.id)}

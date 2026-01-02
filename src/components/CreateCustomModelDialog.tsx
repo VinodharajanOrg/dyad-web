@@ -1,3 +1,4 @@
+"use client";
 import React, { useState } from "react";
 import {
   Dialog,
@@ -10,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IpcClient } from "@/ipc/ipc_client";
-import { useMutation } from "@tanstack/react-query";
+import { languageModelsApi } from "@/api/endpoints/language-models";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { showError, showSuccess } from "@/lib/toast";
 
 interface CreateCustomModelDialogProps {
@@ -32,36 +33,45 @@ export function CreateCustomModelDialog({
   const [description, setDescription] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
   const [contextWindow, setContextWindow] = useState<string>("");
+  const [approved] = useState(true);
+  //const [approved, setApproved] = useState(true);
 
-  const ipcClient = IpcClient.getInstance();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!apiName) throw new Error("Model API name is required");
+      if (!displayName) throw new Error("Model display name is required");
+      if (maxOutputTokens && isNaN(parseInt(maxOutputTokens, 10)))
+        throw new Error("Max Output Tokens must be a valid number");
+      if (contextWindow && isNaN(parseInt(contextWindow, 10)))
+        throw new Error("Context Window must be a valid number");
+
       const params = {
-        apiName,
-        displayName,
-        providerId,
-        description: description || undefined,
+        apiName: apiName.trim(),
+        displayName: displayName.trim(),
+        description: description.trim() || undefined,
         maxOutputTokens: maxOutputTokens
           ? parseInt(maxOutputTokens, 10)
           : undefined,
         contextWindow: contextWindow ? parseInt(contextWindow, 10) : undefined,
+        approved,
       };
 
-      if (!params.apiName) throw new Error("Model API name is required");
-      if (!params.displayName)
-        throw new Error("Model display name is required");
-      if (maxOutputTokens && isNaN(params.maxOutputTokens ?? NaN))
-        throw new Error("Max Output Tokens must be a valid number");
-      if (contextWindow && isNaN(params.contextWindow ?? NaN))
-        throw new Error("Context Window must be a valid number");
-
-      await ipcClient.createCustomLanguageModel(params);
+      return languageModelsApi.create(Number(providerId), params);
     },
-    onSuccess: () => {
-      showSuccess("Custom model created successfully!");
+    onSuccess: (data) => {
+      showSuccess(data.message || "Custom model created successfully!");
+      // Invalidate the models cache to trigger a refetch
+      queryClient.invalidateQueries({
+        queryKey: ["language-models", providerId],
+      });
+      // Invalidate ModelPicker's language-models-by-providers cache
+      queryClient.invalidateQueries({
+        queryKey: ["language-models-by-providers"],
+      });
       resetForm();
-      onSuccess(); // Refetch or update UI
+      onSuccess();
       onClose();
     },
     onError: (error) => {

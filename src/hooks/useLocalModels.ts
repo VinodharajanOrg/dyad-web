@@ -5,7 +5,7 @@ import {
   localModelsLoadingAtom,
   localModelsErrorAtom,
 } from "@/atoms/localModelsAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 
 export function useLocalModels() {
   const [models, setModels] = useAtom(localModelsAtom);
@@ -20,6 +20,14 @@ export function useLocalModels() {
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
+      if (!ipcClient) {
+        console.warn("IPC not available — skipping local model load.");
+        setModels([]); // No models available
+        setError(null); // No actual error
+        return [];
+      }
+
+      // @ts-ignore
       const modelList = await ipcClient.listLocalOllamaModels();
       setModels(modelList);
       setError(null);

@@ -1,38 +1,30 @@
+"use client";
 import { SendIcon, StopCircleIcon } from "lucide-react";
 
 import { useSettings } from "@/hooks/useSettings";
 import { homeChatInputValueAtom } from "@/atoms/chatAtoms"; // Use a different atom for home input
 import { useAtom } from "jotai";
-import { useStreamChat } from "@/hooks/useStreamChat";
+// import { useStreamChat } from "@/hooks/useStreamChat";
 import { useAttachments } from "@/hooks/useAttachments";
 import { AttachmentsList } from "./AttachmentsList";
 import { DragDropOverlay } from "./DragDropOverlay";
 import { FileAttachmentDropdown } from "./FileAttachmentDropdown";
 import { usePostHog } from "posthog-js/react";
-import { HomeSubmitOptions } from "@/pages/home";
+import { HomeSubmitOptions } from "@/page-components/home";
 import { ChatInputControls } from "../ChatInputControls";
 import { LexicalChatInput } from "./LexicalChatInput";
 import { useChatModeToggle } from "@/hooks/useChatModeToggle";
-import { useTypingPlaceholder } from "@/hooks/useTypingPlaceholder";
 export function HomeChatInput({
   onSubmit,
+  isStreaming,
 }: {
   onSubmit: (options?: HomeSubmitOptions) => void;
+  isStreaming: boolean;
 }) {
   const posthog = usePostHog();
   const [inputValue, setInputValue] = useAtom(homeChatInputValueAtom);
   const { settings } = useSettings();
-  const { isStreaming } = useStreamChat({
-    hasChatId: false,
-  }); // eslint-disable-line @typescript-eslint/no-unused-vars
   useChatModeToggle();
-
-  const typingText = useTypingPlaceholder([
-    "an ecommerce store...",
-    "an information page...",
-    "a landing page...",
-  ]);
-  const placeholder = `Ask Dyad to build ${typingText ?? ""}`;
 
   // Use the attachments hook
   const {
@@ -91,10 +83,9 @@ export function HomeChatInput({
               onChange={setInputValue}
               onSubmit={handleCustomSubmit}
               onPaste={handlePaste}
-              placeholder={placeholder}
+              placeholder="Ask Dyad to build..."
               disabled={isStreaming}
               excludeCurrentApp={false}
-              disableSendButton={false}
             />
 
             {/* File attachment dropdown */}

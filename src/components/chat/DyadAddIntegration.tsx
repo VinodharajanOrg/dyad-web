@@ -1,5 +1,6 @@
+"use client";
 import React from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useAtomValue } from "jotai";
@@ -19,7 +20,7 @@ export const DyadAddIntegration: React.FC<DyadAddIntegrationProps> = ({
   node,
   children,
 }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const { provider } = node.properties;
   const appId = useAtomValue(selectedAppIdAtom);
@@ -30,7 +31,7 @@ export const DyadAddIntegration: React.FC<DyadAddIntegrationProps> = ({
       showError("No app ID found");
       return;
     }
-    navigate({ to: "/app-details", search: { appId } });
+    router.push(`/app-details?appId=${appId}`);
   };
 
   if (app?.supabaseProjectName) {

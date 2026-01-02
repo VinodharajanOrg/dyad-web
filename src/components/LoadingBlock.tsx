@@ -1,6 +1,7 @@
+"use client";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { IpcClient } from "@/ipc/ipc_client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 const customLink = ({
   node: _node,
@@ -15,7 +16,7 @@ const customLink = ({
       const url = props.href;
       if (url) {
         e.preventDefault();
-        IpcClient.getInstance().openExternalUrl(url);
+        openExternalUrl(url);
       }
     }}
   />

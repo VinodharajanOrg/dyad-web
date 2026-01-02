@@ -1,3 +1,4 @@
+"use client";
 import {
   Dialog,
   DialogContent,
@@ -17,16 +18,14 @@ import {
   FileIcon,
   SparklesIcon,
 } from "lucide-react";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import { useState, useEffect } from "react";
 import { useAtomValue } from "jotai";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
-import { ChatLogsData } from "@/ipc/ipc_types";
 import { showError } from "@/lib/toast";
 import { HelpBotDialog } from "./HelpBotDialog";
 import { useSettings } from "@/hooks/useSettings";
-import { BugScreenshotDialog } from "./BugScreenshotDialog";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 
 interface HelpDialogProps {
   isOpen: boolean;
@@ -37,14 +36,13 @@ export function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
-  const [chatLogsData, setChatLogsData] = useState<ChatLogsData | null>(null);
+  const [chatLogsData, setChatLogsData] = useState<any>(null);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [isHelpBotOpen, setIsHelpBotOpen] = useState(false);
-  const [isBugScreenshotOpen, setIsBugScreenshotOpen] = useState(false);
   const selectedChatId = useAtomValue(selectedChatIdAtom);
   const { settings } = useSettings();
-  const { userBudget } = useUserBudgetInfo();
+
   const isDyadProUser = settings?.providerSettings?.["auto"]?.apiKey?.value;
 
   // Function to reset all dialog state
@@ -73,7 +71,9 @@ export function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
     setIsLoading(true);
     try {
       // Get system debug info
-      const debugInfo = await IpcClient.getInstance().getSystemDebugInfo();
+      const debugInfo = await (
+        IpcClient.getInstance() as any
+      ).getSystemDebugInfo();
 
       // Create a formatted issue body with the debug info
       const issueBody = `
@@ -94,9 +94,6 @@ Issues that do not meet these requirements will be closed and may need to be res
 ## Actual Behavior (required)
 <!-- What actually happened? -->
 
-## Screenshot (Optional)
-<!-- Screenshot of the bug -->
-
 ## System Information
 - Dyad Version: ${debugInfo.dyadVersion}
 - Platform: ${debugInfo.platform}
@@ -104,7 +101,6 @@ Issues that do not meet these requirements will be closed and may need to be res
 - Node Version: ${debugInfo.nodeVersion || "n/a"}
 - PNPM Version: ${debugInfo.pnpmVersion || "n/a"}
 - Node Path: ${debugInfo.nodePath || "n/a"}
-- Pro User ID: ${userBudget?.redactedUserId || "n/a"}
 - Telemetry ID: ${debugInfo.telemetryId || "n/a"}
 - Model: ${debugInfo.selectedLanguageModel || "n/a"}
 
@@ -124,13 +120,11 @@ ${debugInfo.logs.slice(-3_500) || "No logs available"}
       const githubIssueUrl = `https://github.com/dyad-sh/dyad/issues/new?title=${encodedTitle}&labels=${labels}&body=${encodedBody}`;
 
       // Open the pre-filled GitHub issue page
-      IpcClient.getInstance().openExternalUrl(githubIssueUrl);
+      openExternalUrl(githubIssueUrl);
     } catch (error) {
       console.error("Failed to prepare bug report:", error);
       // Fallback to opening the regular GitHub issue page
-      IpcClient.getInstance().openExternalUrl(
-        "https://github.com/dyad-sh/dyad/issues/new",
-      );
+      openExternalUrl("https://github.com/dyad-sh/dyad/issues/new");
     } finally {
       setIsLoading(false);
     }
@@ -145,8 +139,9 @@ ${debugInfo.logs.slice(-3_500) || "No logs available"}
     setIsUploading(true);
     try {
       // Get chat logs (includes debug info, chat data, and codebase)
-      const chatLogs =
-        await IpcClient.getInstance().getChatLogs(selectedChatId);
+      const chatLogs = await (IpcClient.getInstance() as any).getChatLogs(
+        selectedChatId,
+      );
 
       // Store data for review and switch to review mode
       setChatLogsData(chatLogs);
@@ -195,7 +190,7 @@ ${debugInfo.logs.slice(-3_500) || "No logs available"}
 
       const { uploadUrl, filename } = await response.json();
 
-      await IpcClient.getInstance().uploadToSignedUrl(
+      await (IpcClient.getInstance() as any).uploadToSignedUrl(
         uploadUrl,
         "application/json",
         chatLogsJson,
@@ -228,7 +223,6 @@ Issues that do not meet these requirements will be closed and may need to be res
 -->
 
 Session ID: ${sessionId}
-Pro User ID: ${userBudget?.redactedUserId || "n/a"}
 
 ## Issue Description (required)
 <!-- Please describe the issue you're experiencing -->
@@ -248,7 +242,7 @@ Pro User ID: ${userBudget?.redactedUserId || "n/a"}
     }
     const githubIssueUrl = `https://github.com/dyad-sh/dyad/issues/new?title=${encodedTitle}&labels=${labels}&body=${encodedBody}`;
 
-    IpcClient.getInstance().openExternalUrl(githubIssueUrl);
+    openExternalUrl(githubIssueUrl);
     handleClose();
   };
 
@@ -320,7 +314,7 @@ Pro User ID: ${userBudget?.redactedUserId || "n/a"}
             <div className="border rounded-md p-3">
               <h3 className="font-medium mb-2">Chat Messages</h3>
               <div className="text-sm bg-slate-50 dark:bg-slate-900 rounded p-2 max-h-40 overflow-y-auto">
-                {chatLogsData.chat.messages.map((msg) => (
+                {chatLogsData.chat.messages.map((msg: any) => (
                   <div key={msg.id} className="mb-2">
                     <span className="font-semibold">
                       {msg.role === "user" ? "You" : "Assistant"}:{" "}
@@ -418,9 +412,7 @@ Pro User ID: ${userBudget?.redactedUserId || "n/a"}
               <Button
                 variant="outline"
                 onClick={() => {
-                  IpcClient.getInstance().openExternalUrl(
-                    "https://www.dyad.sh/docs",
-                  );
+                  openExternalUrl("https://www.dyad.sh/docs");
                 }}
                 className="w-full py-6 bg-(--background-lightest)"
               >
@@ -435,10 +427,7 @@ Pro User ID: ${userBudget?.redactedUserId || "n/a"}
           <div className="flex flex-col space-y-2">
             <Button
               variant="outline"
-              onClick={() => {
-                handleClose();
-                setIsBugScreenshotOpen(true);
-              }}
+              onClick={handleReportBug}
               disabled={isLoading}
               className="w-full py-6 bg-(--background-lightest)"
             >
@@ -470,12 +459,6 @@ Pro User ID: ${userBudget?.redactedUserId || "n/a"}
       <HelpBotDialog
         isOpen={isHelpBotOpen}
         onClose={() => setIsHelpBotOpen(false)}
-      />
-      <BugScreenshotDialog
-        isOpen={isBugScreenshotOpen}
-        onClose={() => setIsBugScreenshotOpen(false)}
-        handleReportBug={handleReportBug}
-        isLoading={isLoading}
       />
     </Dialog>
   );

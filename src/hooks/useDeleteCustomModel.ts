@@ -1,44 +1,46 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
-
-interface DeleteCustomModelParams {
-  providerId: string;
-  modelApiName: string;
-}
+import { languageModelsApi } from "@/api/endpoints/language-models";
 
 export function useDeleteCustomModel({
+  providerId,
   onSuccess,
   onError,
 }: {
+  providerId?: string | number;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
 }) {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<void, Error, DeleteCustomModelParams>({
-    mutationFn: async (params: DeleteCustomModelParams) => {
-      if (!params.providerId || !params.modelApiName) {
-        throw new Error(
-          "Provider ID and Model API Name are required for deletion.",
-        );
+  const mutation = useMutation<void, Error, number>({
+    mutationFn: async (modelId: number) => {
+      if (!modelId) {
+        throw new Error("Model ID is required for deletion.");
       }
-      const ipcClient = IpcClient.getInstance();
-      // This method will be added to IpcClient next
-      await ipcClient.deleteCustomModel(params);
+      await languageModelsApi.delete(modelId);
     },
-    onSuccess: (data, params: DeleteCustomModelParams) => {
-      // Invalidate queries related to language models for the specific provider
-      queryClient.invalidateQueries({
-        queryKey: ["language-models", params.providerId],
-      });
-      // Invalidate general model list if needed
+    onSuccess: () => {
+      // Invalidate queries related to language models for this specific provider
+      if (providerId) {
+        queryClient.invalidateQueries({
+          queryKey: ["language-models", providerId],
+        });
+      } else {
+        // Fallback: invalidate all language-models queries
+        queryClient.invalidateQueries({
+          queryKey: ["language-models"],
+        });
+      }
+      // Invalidate ModelPicker's language-models-by-providers cache
       queryClient.invalidateQueries({
         queryKey: ["language-models-by-providers"],
       });
+      // Invalidate general model list if needed
+      queryClient.invalidateQueries({ queryKey: ["languageModels"] });
       onSuccess?.();
     },
     onError: (error: Error) => {
-      console.error("Error deleting custom model:", error);
+      console.error("Error deleting model:", error);
       onError?.(error);
     },
     meta: {

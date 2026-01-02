@@ -1,3 +1,4 @@
+"use client";
 import { Paperclip, MessageSquare, Upload } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,6 +69,7 @@ export function FileAttachmentDropdown({
                 </Button>
               </TooltipTrigger>
             </DropdownMenuTrigger>
+            {/* NOTE: Disabling file attachment for now. */}
             <DropdownMenuContent align="start">
               <TooltipProvider>
                 <Tooltip>
@@ -75,6 +77,7 @@ export function FileAttachmentDropdown({
                     <DropdownMenuItem
                       onClick={handleChatContextClick}
                       className="py-3 px-4"
+                      disabled
                     >
                       <MessageSquare size={16} className="mr-2" />
                       Attach file as chat context
@@ -86,13 +89,14 @@ export function FileAttachmentDropdown({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-
+              {/* NOTE: Disabling file attachment for now. */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuItem
                       onClick={handleUploadToCodebaseClick}
                       className="py-3 px-4"
+                      disabled
                     >
                       <Upload size={16} className="mr-2" />
                       Upload file to codebase

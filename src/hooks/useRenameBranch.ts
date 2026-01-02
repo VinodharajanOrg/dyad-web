@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
+import { gitApi } from "@/api/endpoints/git";
+import { IpcClient } from "@/api/ipc_client";
 import { showError } from "@/lib/toast";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useAtomValue } from "jotai";
@@ -25,7 +26,21 @@ export function useRenameBranch() {
       if (!params.newBranchName) {
         throw new Error("New branch name is required.");
       }
-      await IpcClient.getInstance().renameBranch(params);
+
+      try {
+        await gitApi.renameBranch(params);
+      } catch (restError) {
+        // Fallback to IPC if REST API not implemented
+        console.warn(
+          "Git REST API not available, falling back to IPC:",
+          restError,
+        );
+        const ipcClient = IpcClient.getInstance();
+        if (!ipcClient) {
+          throw new Error("Version control not available");
+        }
+        await (ipcClient as any).renameBranch(params);
+      }
     },
     onSuccess: (_, variables) => {
       // Invalidate queries that depend on branch information
@@ -35,7 +50,6 @@ export function useRenameBranch() {
       queryClient.invalidateQueries({
         queryKey: ["versions", variables.appId],
       });
-      // Potentially show a success message or trigger other actions
     },
     meta: {
       showErrorToast: true,

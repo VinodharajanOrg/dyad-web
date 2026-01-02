@@ -74,8 +74,9 @@
 // 1234567890
 // 1234567890
 // 1234567890
-// 1234567890
-// 1234567890
+
+// Export statement to make this file non-empty
+export const veryLargeFileMarker = "This is a fixture file";
 // 1234567890
 // 1234567890
 // 1234567890

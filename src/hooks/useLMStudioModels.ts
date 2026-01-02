@@ -5,7 +5,7 @@ import {
   lmStudioModelsLoadingAtom,
   lmStudioModelsErrorAtom,
 } from "@/atoms/localModelsAtoms";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 
 export function useLocalLMSModels() {
   const [models, setModels] = useAtom(lmStudioModelsAtom);
@@ -20,6 +20,16 @@ export function useLocalLMSModels() {
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
+      if (!ipcClient) {
+        console.warn(
+          "IPC not available — LM Studio models disabled in web mode.",
+        );
+        setModels([]);
+        setError(null);
+        return [];
+      }
+
+      // @ts-ignore
       const modelList = await ipcClient.listLocalLMStudioModels();
       setModels(modelList);
       setError(null);

@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { Folder, FolderOpen } from "lucide-react";
 import { selectedFileAtom } from "@/atoms/viewAtoms";

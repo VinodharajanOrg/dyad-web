@@ -1,20 +1,19 @@
+"use client";
+
 import { useAtom } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useLoadApps } from "@/hooks/useLoadApps";
-import { useRouter, useLocation } from "@tanstack/react-router";
+import { useRouter, usePathname } from "next/navigation";
 import { useSettings } from "@/hooks/useSettings";
 import { Button } from "@/components/ui/button";
-// @ts-ignore
-import logo from "../../assets/logo.svg";
-import { providerSettingsRoute } from "@/routes/settings/providers/$provider";
 import { cn } from "@/lib/utils";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { useEffect, useState } from "react";
 import { DyadProSuccessDialog } from "@/components/DyadProSuccessDialog";
 import { useTheme } from "@/contexts/ThemeContext";
-import { IpcClient } from "@/ipc/ipc_client";
+import { IpcClient } from "@/api/ipc_client";
 import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
-import { UserBudgetInfo } from "@/ipc/ipc_types";
+import { UserBudgetInfo } from "@/types/ipc_types";
 import {
   Tooltip,
   TooltipContent,
@@ -25,8 +24,8 @@ import { ActionHeader } from "@/components/preview_panel/ActionHeader";
 export const TitleBar = () => {
   const [selectedAppId] = useAtom(selectedAppIdAtom);
   const { apps } = useLoadApps();
-  const { navigate } = useRouter();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
   const { settings, refreshSettings } = useSettings();
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
   const [showWindowControls, setShowWindowControls] = useState(false);
@@ -35,7 +34,13 @@ export const TitleBar = () => {
     // Check if we're running on Windows
     const checkPlatform = async () => {
       try {
-        const platform = await IpcClient.getInstance().getSystemPlatform();
+        const ipcClient = IpcClient.getInstance();
+        if (!ipcClient) {
+          // Web mode - no window controls needed
+          setShowWindowControls(false);
+          return;
+        }
+        const platform = await (ipcClient as any).getSystemPlatform();
         setShowWindowControls(platform !== "darwin");
       } catch (error) {
         console.error("Failed to get platform info:", error);
@@ -62,26 +67,27 @@ export const TitleBar = () => {
   }, [lastDeepLink?.timestamp]);
 
   // Get selected app name
-  const selectedApp = apps.find((app) => app.id === selectedAppId);
+  const selectedApp = apps?.find((app) => app.id === selectedAppId);
   const displayText = selectedApp
     ? `App: ${selectedApp.name}`
     : "(no app selected)";
 
   const handleAppClick = () => {
     if (selectedApp) {
-      navigate({ to: "/app-details", search: { appId: selectedApp.id } });
+      router.push(`/app-details?appId=${selectedApp.id}`);
     }
   };
 
-  const isDyadPro = !!settings?.providerSettings?.auto?.apiKey?.value;
-  const isDyadProEnabled = Boolean(settings?.enableDyadPro);
+  const isDyadPro = !!(settings as any)?.providerSettings?.auto?.apiKey?.value;
+  const isDyadProEnabled = Boolean((settings as any)?.enableDyadPro);
 
   return (
     <>
       <div className="@container z-11 w-full h-11 bg-(--sidebar) absolute top-0 left-0 app-region-drag flex items-center">
         <div className={`${showWindowControls ? "pl-2" : "pl-18"}`}></div>
 
-        <img src={logo} alt="Dyad Logo" className="w-6 h-6 mr-0.5" />
+        {/* NOTE: Removed logo image from title bar */}
+        {/* <img src="/logo.svg" alt="Dyad Logo" className="w-6 h-6 mr-0.5" style={{ width: '24px', height: '24px' }} /> */}
         <Button
           data-testid="title-bar-app-name-button"
           variant="outline"
@@ -96,7 +102,8 @@ export const TitleBar = () => {
         {isDyadPro && <DyadProButton isDyadProEnabled={isDyadProEnabled} />}
 
         {/* Preview Header */}
-        {location.pathname === "/chat" && (
+        {(pathname === "/chat" ||
+          (pathname.startsWith("/") && pathname.includes("/chat"))) && (
           <div className="flex-1 flex justify-end">
             <ActionHeader />
           </div>
@@ -118,15 +125,18 @@ function WindowsControls() {
   const ipcClient = IpcClient.getInstance();
 
   const minimizeWindow = () => {
-    ipcClient.minimizeWindow();
+    if (!ipcClient) return;
+    (ipcClient as any).minimizeWindow();
   };
 
   const maximizeWindow = () => {
-    ipcClient.maximizeWindow();
+    if (!ipcClient) return;
+    (ipcClient as any).maximizeWindow();
   };
 
   const closeWindow = () => {
-    ipcClient.closeWindow();
+    if (!ipcClient) return;
+    (ipcClient as any).closeWindow();
   };
 
   return (
@@ -199,16 +209,13 @@ export function DyadProButton({
 }: {
   isDyadProEnabled: boolean;
 }) {
-  const { navigate } = useRouter();
+  const router = useRouter();
   const { userBudget } = useUserBudgetInfo();
   return (
     <Button
       data-testid="title-bar-dyad-pro-button"
       onClick={() => {
-        navigate({
-          to: providerSettingsRoute.id,
-          params: { provider: "auto" },
-        });
+        router.push("/settings");
       }}
       variant="outline"
       className={cn(

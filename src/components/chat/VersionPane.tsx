@@ -1,13 +1,14 @@
+"use client";
 import { useAtom, useAtomValue } from "jotai";
 import { selectedAppIdAtom, selectedVersionIdAtom } from "@/atoms/appAtoms";
-import { useVersions } from "@/hooks/useVersions";
 import { formatDistanceToNow } from "date-fns";
 import { RotateCcw, X, Database, Loader2 } from "lucide-react";
-import type { Version } from "@/ipc/ipc_types";
+import type { Version } from "@/types/ipc_types";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { useCheckoutVersion } from "@/hooks/useCheckoutVersion";
 import { useLoadApp } from "@/hooks/useLoadApp";
+import { ONE_DAY_MS } from "@/lib/constants";
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useRunApp } from "@/hooks/useRunApp";
-
 interface VersionPaneProps {
   isVisible: boolean;
   onClose: () => void;
@@ -25,27 +25,30 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
   const appId = useAtomValue(selectedAppIdAtom);
   const { refreshApp, app } = useLoadApp(appId);
   const { restartApp } = useRunApp();
-  const {
-    versions: liveVersions,
-    refreshVersions,
-    revertVersion,
-    isRevertingVersion,
-  } = useVersions(appId);
+  // NOTE: As of now, we are not using live versions in web mode
+  // const {
+  //   versions: liveVersions,
+  //   refreshVersions,
+  //   revertVersion,
+  //   isRevertingVersion,
+  // } = useVersions(appId);
+  const isRevertingVersion = false;
 
   const [selectedVersionId, setSelectedVersionId] = useAtom(
     selectedVersionIdAtom,
   );
   const { checkoutVersion, isCheckingOutVersion } = useCheckoutVersion();
   const wasVisibleRef = useRef(false);
-  const [cachedVersions, setCachedVersions] = useState<Version[]>([]);
+  //const [cachedVersions,setCachedVersions] = useState<Version[]>([]);
+  const [cachedVersions] = useState<Version[]>([]);
 
   useEffect(() => {
     async function updatePaneState() {
       // When pane becomes visible after being closed
       if (isVisible && !wasVisibleRef.current) {
         if (appId) {
-          await refreshVersions();
-          setCachedVersions(liveVersions);
+          // await refreshVersions();
+          // setCachedVersions(liveVersions);
         }
       }
 
@@ -69,16 +72,16 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
     setSelectedVersionId,
     appId,
     checkoutVersion,
-    refreshVersions,
-    liveVersions,
+    // refreshVersions,
+    // liveVersions,
   ]);
 
   // Initial load of cached versions when live versions become available
   useEffect(() => {
-    if (isVisible && liveVersions.length > 0 && cachedVersions.length === 0) {
-      setCachedVersions(liveVersions);
-    }
-  }, [isVisible, liveVersions, cachedVersions.length]);
+    // if (isVisible && liveVersions.length > 0 && cachedVersions.length === 0) {
+    //   setCachedVersions(liveVersions);
+    // }
+  }, [isVisible, cachedVersions.length]);
 
   if (!isVisible) {
     return null;
@@ -100,7 +103,8 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
     }
   };
 
-  const versions = cachedVersions.length > 0 ? cachedVersions : liveVersions;
+  // const versions = cachedVersions.length > 0 ? cachedVersions : liveVersions;
+  const versions = cachedVersions;
 
   return (
     <div className="h-full border-t border-2 border-border w-full">
@@ -150,8 +154,7 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
                         const timestampMs = new Date(
                           version.dbTimestamp,
                         ).getTime();
-                        const isExpired =
-                          Date.now() - timestampMs > 24 * 60 * 60 * 1000;
+                        const isExpired = Date.now() - timestampMs > ONE_DAY_MS;
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -204,7 +207,7 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
                       )
                         ? version.message.replace(
                             /Reverted all changes back to version ([a-f0-9]+)/,
-                            (_, hash) => {
+                            (_: string, hash: string) => {
                               const targetIndex = versions.findIndex(
                                 (v) => v.oid === hash,
                               );
@@ -227,9 +230,9 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
                           onClick={async (e) => {
                             e.stopPropagation();
 
-                            await revertVersion({
-                              versionId: version.oid,
-                            });
+                            // await revertVersion({
+                            //   versionId: version.oid,
+                            // });
                             setSelectedVersionId(null);
                             // Close the pane after revert to force a refresh on next open
                             onClose();

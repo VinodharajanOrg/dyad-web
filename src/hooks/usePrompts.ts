@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IpcClient } from "@/ipc/ipc_client";
+import { promptsApi } from "@/api/endpoints/prompts";
 
 export interface PromptItem {
   id: number;
@@ -15,9 +15,10 @@ export function usePrompts() {
   const listQuery = useQuery({
     queryKey: ["prompts"],
     queryFn: async (): Promise<PromptItem[]> => {
-      const ipc = IpcClient.getInstance();
-      return ipc.listPrompts();
+      const result = await promptsApi.list();
+      return result.prompts;
     },
+    enabled: false, // NOTE: bypass prompts api
     meta: { showErrorToast: true },
   });
 
@@ -27,8 +28,7 @@ export function usePrompts() {
       description?: string;
       content: string;
     }): Promise<PromptItem> => {
-      const ipc = IpcClient.getInstance();
-      return ipc.createPrompt(params);
+      return promptsApi.create(params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prompts"] });
@@ -45,8 +45,8 @@ export function usePrompts() {
       description?: string;
       content: string;
     }): Promise<void> => {
-      const ipc = IpcClient.getInstance();
-      return ipc.updatePrompt(params);
+      const { id, ...updateParams } = params;
+      await promptsApi.update(id, updateParams);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prompts"] });
@@ -58,8 +58,7 @@ export function usePrompts() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number): Promise<void> => {
-      const ipc = IpcClient.getInstance();
-      return ipc.deletePrompt(id);
+      await promptsApi.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prompts"] });

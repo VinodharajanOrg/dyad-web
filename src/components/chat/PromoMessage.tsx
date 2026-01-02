@@ -1,4 +1,5 @@
-import { IpcClient } from "@/ipc/ipc_client";
+"use client";
+import { openExternalUrl } from "@/utils/openExternalUrl";
 import React from "react";
 
 // Types for the message system
@@ -36,7 +37,7 @@ export function Message({ spans }: MessageConfig) {
                   if (span.action) {
                     span.action();
                   } else if (span.url) {
-                    IpcClient.getInstance().openExternalUrl(span.url);
+                    openExternalUrl(span.url);
                   }
                 }}
                 className="text-blue-600 hover:text-blue-800 underline cursor-pointer"

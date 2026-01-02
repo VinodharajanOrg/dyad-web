@@ -1,4 +1,6 @@
-import { useNavigate } from "@tanstack/react-router";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { PlusCircle, Search } from "lucide-react";
 import { useAtom, useSetAtom } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
@@ -16,7 +18,7 @@ import { AppSearchDialog } from "./AppSearchDialog";
 import { useAddAppToFavorite } from "@/hooks/useAddAppToFavorite";
 import { AppItem } from "./appItem";
 export function AppList({ show }: { show?: boolean }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [selectedAppId, setSelectedAppId] = useAtom(selectedAppIdAtom);
   const setSelectedChatId = useSetAtom(selectedChatIdAtom);
   const { apps, loading, error } = useLoadApps();
@@ -24,18 +26,6 @@ export function AppList({ show }: { show?: boolean }) {
     useAddAppToFavorite();
   // search dialog state
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-
-  const allApps = useMemo(
-    () =>
-      apps.map((a) => ({
-        id: a.id,
-        name: a.name,
-        createdAt: a.createdAt,
-        matchedChatTitle: null,
-        matchedChatMessage: null,
-      })),
-    [apps],
-  );
 
   const favoriteApps = useMemo(
     () => apps.filter((app) => app.isFavorite),
@@ -55,14 +45,11 @@ export function AppList({ show }: { show?: boolean }) {
     setSelectedAppId(id);
     setSelectedChatId(null);
     setIsSearchDialogOpen(false);
-    navigate({
-      to: "/",
-      search: { appId: id },
-    });
+    router.push(`/app-details?appId=${id}`);
   };
 
   const handleNewApp = () => {
-    navigate({ to: "/" });
+    router.push("/");
     // We'll eventually need a create app workflow
   };
 
@@ -143,7 +130,7 @@ export function AppList({ show }: { show?: boolean }) {
         open={isSearchDialogOpen}
         onOpenChange={setIsSearchDialogOpen}
         onSelectApp={handleAppClick}
-        allApps={allApps}
+        allApps={apps}
       />
     </>
   );
