@@ -35,11 +35,12 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - certbot-www:/var/www/certbot:ro
       - certbot-conf:/etc/letsencrypt:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - dyad-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
