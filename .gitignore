@@ -65,6 +65,12 @@ next-env.d.ts
 
 # Local development
 .turbo
+
+# SSL Certificates (never commit private keys)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
 # SonarQube
 .scannerwork/
 sonar-project.properties

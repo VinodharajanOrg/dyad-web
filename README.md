@@ -29,7 +29,24 @@ No sign-up required. Just download and go.
 
 Join our growing community of AI app builders on **Reddit**: [r/dyadbuilders](https://www.reddit.com/r/dyadbuilders/) - share your projects and get help from the community!
 
-## 🛠️ Contributing
+## � Production Deployment with HTTPS
+
+For production deployments with HTTPS support using Nginx reverse proxy, see our comprehensive guide:
+
+**[HTTPS Setup Documentation](./docs/HTTPS_SETUP.md)**
+
+Quick start:
+```bash
+# Generate SSL certificates
+./scripts/generate-ssl-certs.sh
+
+# Start with Docker Compose
+docker-compose up -d
+```
+
+Access via HTTPS at `https://localhost`
+
+## �🛠️ Contributing
 
 **Dyad** is open-source (Apache 2.0 licensed).
 
